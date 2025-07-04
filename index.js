@@ -1,44 +1,54 @@
+const uuidMap = new Map();
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const discordWebhookUrl = "https://discord.com/api/webhooks/1390383174009356288/czwDTu0es0TsWFzMHFBSppuXgLQbNr-Clkize31XqPomS9nL9NacOj_FxVlhAM8nxHw4"; // replace with yours
-    let payload;
+    const pathname = decodeURIComponent(url.pathname.slice(1)); // remove leading '/'
 
-    if (request.method === "POST") {
-      // POST with JSON body
-      try {
-        const body = await request.text();
-        payload = JSON.parse(body);
-      } catch {
-        return new Response("❌ Invalid JSON body.", { status: 400 });
-      }
-    } else {
-      // GET ?msg= or ?= fallback
-      let message = url.searchParams.get("msg");
-
-      if (!message) {
-        return new Response(`❌ Failed to send to Discord. Status: ${discordResponse.status}`, { status: discordResponse.status });
-      }
-
-      message = message;
-
-      payload = {
-        content: message,
-        username: "CloudflareBot"
-      };
+    let links = {};
+    try {
+      const jsonUrl = 'https://ghost352.neocities.org/RobloxScripts/ScriptsTable/Links.json';
+      const response = await fetch(jsonUrl);
+      if (!response.ok) throw new Error('Non-200 response');
+        links = await response.json();
+    } catch (e) {
+        return new Response("Failed to fetch JSON.", { status: 500 });
     }
 
-    // Send to Discord
-    const discordResponse = await fetch(discordWebhookUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    if (pathname && pathname !== "access") {
+      const key = pathname;
+      const linkData = links[key];
 
-    if (!discordResponse.ok) {
-      return new Response(`❌ Failed to send to Discord. Status: ${discordResponse.status}`, { status: 500 });
+      if (!linkData) {
+        return new Response(`No data found for key: ${key}`, { status: 404 });
+      }
+
+      // generate UUID
+      const uuid = crypto.randomUUID();
+      uuidMap.set(uuid, linkData);
+
+      return new Response(JSON.stringify({
+        access: `/access/${uuid}`
+      }), {
+        headers: { "Content-Type": "application/json" }
+      });
     }
 
-    return new Response(`✅ Sent to Discord`);
+    if (pathname.startsWith("access/")) {
+      const uuid = pathname.split("/")[1];
+      const data = uuidMap.get(uuid);
+
+      if (!data) {
+        return new Response("Invalid or expired UUID.", { status: 404 });
+      }
+
+      return new Response(JSON.stringify({
+        content: data
+      }), {
+        headers: { "Content-Type": "application/json" }
+      });
+    }
+
+    return new Response("Not found.", { status: 404 });
   }
 }
