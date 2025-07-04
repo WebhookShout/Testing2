@@ -1,21 +1,21 @@
-const uuidMap = new Map();
-
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const pathname = decodeURIComponent(url.pathname.slice(1)); // remove leading '/'
+    const pathname = decodeURIComponent(url.pathname.slice(1)); // remove leading "/"
 
+    // Fetch JSON data from your source
     let links = {};
     try {
       const jsonUrl = 'https://ghost352.neocities.org/RobloxScripts/ScriptsTable/Links.json';
       const response = await fetch(jsonUrl);
       if (!response.ok) throw new Error('Non-200 response');
-        links = await response.json();
+      links = await response.json();
     } catch (e) {
-        return new Response("Failed to fetch JSON.", { status: 500 });
+      return new Response("Failed to fetch JSON.", { status: 500 });
     }
 
-    if (pathname && pathname !== "access") {
+    // Handle "/<key>"
+    if (pathname && !pathname.startsWith("access")) {
       const key = pathname;
       const linkData = links[key];
 
@@ -23,27 +23,31 @@ export default {
         return new Response(`No data found for key: ${key}`, { status: 404 });
       }
 
-      // generate UUID
+      // Generate UUID, save in KV
       const uuid = crypto.randomUUID();
-      uuidMap.set(uuid, linkData);
+      await env.MYLINKS.put(uuid, JSON.stringify(linkData));
+
+      // Automatically get the current domain
+      const domain = url.origin;
 
       return new Response(JSON.stringify({
-        access: `${url.origin}/access/${uuid}`
+        access: `${domain}/access/${uuid}`
       }), {
         headers: { "Content-Type": "application/json" }
       });
     }
 
+    // Handle "/access/<uuid>"
     if (pathname.startsWith("access/")) {
       const uuid = pathname.split("/")[1];
-      const data = uuidMap.get(uuid);
+      const data = await env.MYLINKS.get(uuid);
 
       if (!data) {
         return new Response("Invalid or expired UUID.", { status: 404 });
       }
 
       return new Response(JSON.stringify({
-        content: data
+        content: JSON.parse(data)
       }), {
         headers: { "Content-Type": "application/json" }
       });
