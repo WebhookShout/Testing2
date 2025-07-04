@@ -19,8 +19,8 @@ export default {
       const key = pathname;
       const content = await fetch(links[key]);
 
-      if (!linkData) {
-        return new Response(`No data found for key: ${key}`, { status: 404 });
+      if (!content) {
+        return new Response(`No content found for key: ${key}`, { status: 404 });
       }
 
       // Generate UUID and store in KV
