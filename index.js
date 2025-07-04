@@ -1,9 +1,9 @@
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const pathname = decodeURIComponent(url.pathname.slice(1)); // remove leading "/"
+    const pathname = decodeURIComponent(url.pathname.slice(1));
 
-    // Fetch JSON data from your source
+    // Fetch JSON data from your external source
     let links = {};
     try {
       const jsonUrl = 'https://ghost352.neocities.org/RobloxScripts/ScriptsTable/Links.json';
@@ -23,13 +23,12 @@ export default {
         return new Response(`No data found for key: ${key}`, { status: 404 });
       }
 
-      // Generate UUID, save in KV
+      // Generate UUID and store in KV
       const uuid = crypto.randomUUID();
       await env.MYLINKS.put(uuid, JSON.stringify(linkData));
 
-      // Automatically get the current domain
+      // Return with dynamic domain
       const domain = url.origin;
-
       return new Response(JSON.stringify({
         access: `${domain}/access/${uuid}`
       }), {
