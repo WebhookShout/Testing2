@@ -28,7 +28,7 @@ export default {
       uuidMap.set(uuid, linkData);
 
       return new Response(JSON.stringify({
-        access: `/access/${uuid}`
+        access: `${url.origin}/access/${uuid}`
       }), {
         headers: { "Content-Type": "application/json" }
       });
