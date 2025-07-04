@@ -3,3 +3,7 @@ type = "module"
 main = "index.js"
 compatibility_date = "2025-07-04"
 workers_dev = true
+
+[[kv_namespaces]]
+binding = "MYLINKS"
+id = "97a5ab8aa69641eda42dd4b196097997"
