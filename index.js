@@ -17,7 +17,7 @@ export default {
     // Handle "/<key>"
     if (pathname && !pathname.startsWith("access")) {
       const key = pathname;
-      const linkData = links[key];
+      const content = await fetch(links[key]);
 
       if (!linkData) {
         return new Response(`No data found for key: ${key}`, { status: 404 });
@@ -25,7 +25,7 @@ export default {
 
       // Generate UUID and store in KV
       const uuid = crypto.randomUUID();
-      await env.MYLINKS.put(uuid, JSON.stringify(linkData));
+      await env.MYLINKS.put(uuid, JSON.stringify(content));
 
       // Return with dynamic domain
       const domain = url.origin;
