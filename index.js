@@ -17,10 +17,11 @@ export default {
     // Handle "/<key>"
     if (pathname && !pathname.startsWith("access")) {
       const key = pathname;
-      const content = await fetch(links[key]);
+      const linkData = links[key];
+      const content = await fetch(linkData);
 
-      if (!content) {
-        return new Response(`No content found for key: ${key}`, { status: 404 });
+      if (!linkData) {
+        return new Response(`No data found for key: ${key}`, { status: 404 });
       }
 
       // Generate UUID and store in KV
