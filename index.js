@@ -39,7 +39,7 @@ export default {
 
       const textContent = await resp.text();
       const randomName = GetRandomName();
-      return new Response(randomName, {
+      return new Response(`local AuthKey = "${randomName}"\n${textContent}`, {
         headers: { "Content-Type": "text/plain" }
       });
     }
