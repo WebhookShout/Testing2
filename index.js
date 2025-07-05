@@ -1,9 +1,11 @@
+const uuidMap = new Map();
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    const pathname = decodeURIComponent(url.pathname.slice(1));
+    const pathname = decodeURIComponent(url.pathname.slice(1)); // remove leading '/'
 
-    // Fetch JSON data from your external source
+    // fetch your JSON
     let links = {};
     try {
       const jsonUrl = 'https://ghost352.neocities.org/RobloxScripts/ScriptsTable/Links.json';
@@ -14,43 +16,16 @@ export default {
       return new Response("Failed to fetch JSON.", { status: 500 });
     }
 
-    // Handle "/<key>"
-    if (pathname && !pathname.startsWith("access")) {
+    // fetch key
+    if (pathname) {
       const key = pathname;
       const linkData = links[key];
-      const content = await fetch(linkData);
 
       if (!linkData) {
         return new Response(`No data found for key: ${key}`, { status: 404 });
       }
-
-      // Generate UUID and store in KV
-      const uuid = crypto.randomUUID();
-      await env.MYLINKS.put(uuid, JSON.stringify(content));
-
-      // Return with dynamic domain
-      const domain = url.origin;
-      return new Response(JSON.stringify({
-        access: `${domain}/access/${uuid}`
-      }), {
-        headers: { "Content-Type": "application/json" }
-      });
-    }
-
-    // Handle "/access/<uuid>"
-    if (pathname.startsWith("access/")) {
-      const uuid = pathname.split("/")[1];
-      const data = await env.MYLINKS.get(uuid);
-
-      if (!data) {
-        return new Response("Invalid or expired UUID.", { status: 404 });
-      }
-
-      return new Response(JSON.stringify({
-        content: JSON.parse(data)
-      }), {
-        headers: { "Content-Type": "application/json" }
-      });
+      const content = await fetch(linkData);
+      return new Response(content);
     }
 
     return new Response("Not found.", { status: 404 });
