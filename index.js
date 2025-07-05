@@ -109,7 +109,8 @@ export default {
       const key = pathname;
       const linkData = links[key];
       const decodedAuth = DecodeText(auth, ServiceKey);
-      pathname = decodeURIComponent(url.pathname.slice(1));
+      let pathname = url.pathname.slice(1);
+      pathname = decodeURIComponent(pathname);
       
       if (!linkData) {
         return new Response(`404: Not Found`, { status: 404 });
