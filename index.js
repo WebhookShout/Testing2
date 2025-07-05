@@ -1,3 +1,14 @@
+// Get Random Name Function
+function GetRandomName(length = Math.floor(Math.random() * 100) + 1) {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    const randIndex = Math.floor(Math.random() * characters.length);
+    result += characters[randIndex];
+  }
+  return result;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -29,7 +40,7 @@ export default {
       }
       
       const textContent = await resp.text();
-      return new Response(textContent, {
+      return new Response(`${GetRandomName()}\n` + textContent, {
         headers: { "Content-Type": "text/plain" }
       });
     }
