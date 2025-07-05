@@ -98,9 +98,9 @@ export default {
 
     // Detect if request UserAgent is not include "Roblox"
     if (!userAgent.includes('Roblox')) {
-      return new Response('404: Not Found', { status: 403 });
+     // return new Response('404: Not Found', { status: 403 });
     }
-    
+
     let links = {};
     try {
       const jsonUrl = ScriptsLink;
@@ -121,6 +121,11 @@ export default {
         return new Response(`404: Not Found`, { status: 404 });
       }
 
+      // Detect if Access ID is Expired
+      if (data.Expiration < Date.now()) {
+        return new Response(`404: Not Found`, { status: 404 });
+      }
+      
       const resp = await fetch(linkData);
       if (!resp.ok) {
         return new Response(`${resp.status}: Failed to fetch content`, { status: 500 });
@@ -149,7 +154,7 @@ export default {
       const randomName = GetRandomName();
       const secureName = GetRandomName();
       const secureKey = generateSecureKey();
-      const json = JSON.stringify({Key: secureKey, Name: secureName});
+      const json = JSON.stringify({Key: secureKey, Name: secureName, Expiration: Date.now() + 3000});
       const code = `local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]="${randomKey}",[13]="${randomName}",[14]="${secureKey}",[15]="${secureName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] local x=t[1][t[2]](t[3])x[t[7]]=t[4][t[5]](t[4], t[6])x[t[8]]=t[15]x[t[9]]=t[11]x[t[10]]=t[14] loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))()`;
 
       return new Response(code, {
