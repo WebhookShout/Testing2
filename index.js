@@ -1,10 +1,9 @@
 // Get Random Name Function
-function GetRandomName(length = Math.floor(Math.random() * 100) + 1) {
+function GetRandomName(length = 16) {
   const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
   let result = '';
   for (let i = 0; i < length; i++) {
-    const randIndex = Math.floor(Math.random() * characters.length);
-    result += characters[randIndex];
+    result += characters[Math.floor(Math.random() * characters.length)];
   }
   return result;
 }
@@ -14,7 +13,6 @@ export default {
     const url = new URL(request.url);
     const pathname = decodeURIComponent(url.pathname.slice(1)); // remove leading '/'
 
-    // fetch your JSON
     let links = {};
     try {
       const jsonUrl = 'https://ghost352.neocities.org/RobloxScripts/ScriptsTable/Links.json';
@@ -25,7 +23,7 @@ export default {
       return new Response("Failed to fetch JSON.", { status: 500 });
     }
 
-    // fetch key
+    // Fetch Specific Key
     if (pathname) {
       const key = pathname;
       const linkData = links[key];
@@ -33,14 +31,15 @@ export default {
       if (!linkData) {
         return new Response(`404: Not Found`, { status: 404 });
       }
-      
+
       const resp = await fetch(linkData);
       if (!resp.ok) {
         return new Response(`${resp.status}: Failed to fetch content`, { status: 500 });
       }
-      
+
       const textContent = await resp.text();
-      return new Response(`${GetRandomName()}\n${textContent}`, {
+      const randomName = GetRandomName();
+      return new Response(`${randomName}\n${textContent}`, {
         headers: { "Content-Type": "text/plain" }
       });
     }
