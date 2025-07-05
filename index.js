@@ -22,12 +22,12 @@ export default {
       const linkData = links[key];
 
       if (!linkData) {
-        return new Response(`No data found for key: ${key}`, { status: 404 });
+        return new Response(`404: Not Found`, { status: 404 });
       }
       
       const resp = await fetch(linkData);
       if (!resp.ok) {
-        return new Response(`Failed to fetch linked content: ${resp.status}`, { status: 500 });
+        return new Response(`${resp.status}: Failed to fetch content`, { status: 500 });
       }
       
       const textContent = await resp.text();
