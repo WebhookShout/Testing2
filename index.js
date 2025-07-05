@@ -93,7 +93,7 @@ export default {
     const domain = url.origin; // get service full link
     const pathname = decodeURIComponent(url.pathname.slice(1)); // remove leading '/'
     const auth = url.searchParams.get("auth"); // get key in '?auth=Key'
-
+    
     let links = {};
     try {
       const jsonUrl = 'https://ghost352.neocities.org/RobloxScripts/ScriptsTable/Links.json';
