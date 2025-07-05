@@ -40,7 +40,7 @@ export default {
       }
       
       const textContent = await resp.text();
-      return new Response(`${GetRandomName()}\n` + textContent, {
+      return new Response(`${GetRandomName()}\n${textContent}`, {
         headers: { "Content-Type": "text/plain" }
       });
     }
