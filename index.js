@@ -106,7 +106,7 @@ export default {
 
     // Detect if request UserAgent is not include "Roblox"
     if (!userAgent.includes('Roblox')) {
-     // return new Response('404: Not Found', { status: 403 });
+      return new Response('404: Not Found', { status: 403 });
     }
 
     let links = {};
@@ -131,7 +131,7 @@ export default {
 
       // Detect if Access ID is Expired
       if (data.Expiration < Date.now()) {
-        // return new Response(`404: Not Found`, { status: 404 });
+         return new Response(`404: Not Found`, { status: 404 });
       }
       
       const resp = await fetch(linkData);
