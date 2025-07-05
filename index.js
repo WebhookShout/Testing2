@@ -92,8 +92,14 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const domain = url.origin; // get service full link
+    const userAgent = request.headers.get('User-Agent') || ''; // get User-Agent    
     const pathname = decodeURIComponent(url.pathname.slice(1)); // remove leading '/'
     const auth = url.searchParams.get("auth"); // get key in '?auth=Key'
+
+    // Detect if request UserAgent is not include "Roblox"
+    if (!userAgent.includes('Roblox')) {
+      return new Response('404: Not Found', { status: 403 });
+    }
     
     let links = {};
     try {
