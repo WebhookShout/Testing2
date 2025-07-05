@@ -81,7 +81,7 @@ function encodeAscii(str) {
   return str
     .split('')
     .map(char => char.charCodeAt(0))
-    .join('\\') + '\\';
+    .join('\\');
 }
 
 // Encode Script Function
