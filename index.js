@@ -8,6 +8,22 @@ function GetRandomName(length = 16) {
   return result;
 }
 
+// Generate Secured Key Function
+function generateSecureKey(length = 32, segmentLength = 4) {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+
+  let key = '';
+  for (let i = 0; i < array.length; i++) {
+    key += chars[array[i] % chars.length];
+    if ((i + 1) % segmentLength === 0 && i + 1 !== array.length) {
+      key += '-';
+    }
+  }
+  return key;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -38,8 +54,8 @@ export default {
       }
 
       const textContent = await resp.text();
-      const randomName = GetRandomName();
-      return new Response(`local AuthKey = "${randomName}"\n${textContent}`, {
+      const AuthKey = generateSecureKey();
+      return new Response(`local AuthKey = "${AuthKey}"\n${textContent}`, {
         headers: { "Content-Type": "text/plain" }
       });
     }
