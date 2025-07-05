@@ -122,7 +122,7 @@ export default {
 
       const textContent = await resp.text();
       const content = `game:GetService("ReplicatedStorage"):WaitForChild("${data.Name}").Value = tostring(math.random(1000000, 10000000))\n${textContent}`;
-      const encoded = EncodeScript(content, String(data.Key))
+      const encoded = EncodeScript(content, String(data.Key));
       const script = `local function Decode(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local obj = a[b](a, c)["${data.Name}"] loadstring(Decode("${encoded}", obj.Value))()`;
       
       return new Response(script, {
