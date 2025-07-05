@@ -24,8 +24,14 @@ export default {
       if (!linkData) {
         return new Response(`No data found for key: ${key}`, { status: 404 });
       }
-      const content = await fetch(linkData);
-      return new Response(content);
+      const resp = await fetch(linkData);
+      if (!resp.ok) {
+        return new Response(`Failed to fetch linked content: ${resp.status}`, { status: 500 });
+      }
+      const textContent = await resp.text();
+      return new Response(textContent, {
+        headers: { "Content-Type": "text/plain" }
+      });
     }
 
     return new Response("Not found.", { status: 404 });
