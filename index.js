@@ -126,12 +126,17 @@ export default {
       const linkData = links[key];
       const data = JSON.parse(DecodeText(auth, ServiceKey));
       
-      if (!linkData || !data) {
+      if (!linkData) {
         return new Response(`404: Not Found`, { status: 404 });
       }
 
+      // Detect if data decoded error
+      if (!data || typeof data !== 'object' || !('Expiration' in data)) {
+        return new Response(`404: Not Found`, { status: 404 });
+      }
+      
       // Detect if Access ID is Expired
-      if (data.Expiration <= Date.now()) {
+      if (data.Expiration < Date.now()) {
          return new Response(`404: Not Found`, { status: 404 });
       }
       
