@@ -52,13 +52,13 @@ function DecodeText(encoded, key) {
 
 // Get Random Name Function
 function GetRandomName() {
-    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-    const length = Math.floor(Math.random() * (32 - 16 + 1)) + 16; // random length between 16 and 32
-    let result = '';
-    for (let i = 0; i < length; i++) {
-        result += characters.charAt(Math.floor(Math.random() * characters.length));
-    }
-    return result;
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const length = Math.floor(Math.random() * (32 - 16 + 1)) + 16; // random length between 16 and 32
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
 }
 
 // Generate Secured Key Function
@@ -132,7 +132,7 @@ export default {
 
       // Detect if data decoded error
       if (!data || typeof data !== 'object' || !('Expiration' in data)) {
-        return new Response(`404: Not Found`, { status: 404 });
+       // return new Response(`404: Not Found`, { status: 404 });
       }
       
       // Detect if Access ID is Expired
@@ -148,7 +148,8 @@ export default {
       const textContent = await resp.text();
       const content = `game:GetService("ReplicatedStorage"):WaitForChild("${data.Name}").Value = tostring(math.random(1000000, 10000000))\n${textContent}`;
       const encoded = EncodeScript(content, String(data.Key));
-      const script = `loadstring("\\${encodeAscii(`local function Decode(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local obj = a[b](a, c)["${data.Name}"] loadstring(Decode("${encoded}", obj.Value))()`)}")()`;
+      const decodedStr = GetRandomName();
+      const script = `loadstring("\\${encodeAscii(`local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local obj = a[b](a, c)["${data.Name}"] loadstring(${decodedStr}("${encoded}", obj.Value))()`)}")()`;
       
       return new Response(script, {
         headers: { "Content-Type": "text/plain" }
