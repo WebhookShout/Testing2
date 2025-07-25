@@ -126,7 +126,7 @@ export default {
       const linkData = links[key];
       const data = JSON.parse(DecodeText(auth, ServiceKey));
       
-      if (!linkData || !data) {
+      if (!linkData) {
         return new Response(`404: Not Found`, { status: 404 });
       }
 
