@@ -167,7 +167,7 @@ export default {
       const randomName = GetRandomName();
       const secureKey = generateSecureKey();
       const json = JSON.stringify({Key: secureKey, Name: randomName, Expiration: Date.now() + 1500});
-      const code = `print("${Date.now()}")\nprint(os.date("%Y%m%d%H%M%S"))\nloadstring("\\${encodeAscii(`local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]="${secureKey}",[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))()`)}")()`;
+      const code = `print("${Date.now()}")\nprint(os.time() * 1000)\nloadstring("\\${encodeAscii(`local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]="${secureKey}",[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))()`)}")()`;
 
       return new Response(code, {
         headers: { "Content-Type": "text/plain" }
