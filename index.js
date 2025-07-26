@@ -220,7 +220,7 @@ export default {
       const objStr = GetRandomString(18);
       const date = new Date();
       const pad = n => n.toString().padStart(2, '0');
-      const time = date.getFullYear()pad(date.getMonth() + 1)pad(date.getDate())pad(date.getHours())pad(date.getMinutes())pad(date.getSeconds());
+      const time = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
       const script = `
       print("${time}")
       print(os.date("%Y-%m-%d-%H-%M-")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60))
