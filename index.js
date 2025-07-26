@@ -146,17 +146,11 @@ function GetNumberWithMath(num) {
   return expr;
 }
 
-// Encode Number to String Function
-function EncodeNumberToString(num) {
-  const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-  const base = alphabet.length;
-  let result = "";
-  while (num > 0) {
-    const index = num % base;
-    result = alphabet[index] + result;
-    num = Math.floor(num / base);
-  }
-  return result || "a";
+// Encode Hash Code 'Md5' Function
+function EncodeHashCode(str) {
+  const response = await fetch(`https://api.hashify.net/hash/md5/hex?value=${str}`);
+  const json = await response.json();
+  return json.Digest;
 }
 
 
@@ -218,9 +212,8 @@ export default {
       const pad = n => n.toString().padStart(2, '0');
       const time = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
       const script = `
-      print("${EncodeNumberToString(time)}", "${time})
-      local function EncodeNumberToString(num) 	local alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" 	local base = #alphabet 	local result = "" 	num = tonumber(num) 	while num > 0 do 		local index = num % base 		result = alphabet:sub(index + 1, index + 1) .. result 		num = math.floor(num / base) 	end 	return result ~= "" and result or "a" end
-      print(EncodeNumberToString(tostring(os.date("%Y%m%d%H%M")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60))))
+      print("${EncodeHashCode(time)}")
+      print(game:GetService("HttpService"):JSONDecode(game:HttpGet("https://api.hashify.net/hash/md5/hex?value="..os.date("%Y%m%d%H%M")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60))).Digest)
       local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
       local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value
       local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", ${objStr}))()`;
