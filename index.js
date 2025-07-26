@@ -107,6 +107,45 @@ function EncodeScript(str, key) {
   return result.join('/');
 }
 
+// Get Number With Math Function
+function GetNumberWithMath(num) {
+  if (typeof num !== 'number' || !Number.isFinite(num)) return null;
+  const operators = ['+', '-', '*', '/'];
+  const op = operators[Math.floor(Math.random() * operators.length)];
+  let expr;
+  switch (op) {
+    case '+': {
+      const a = Math.floor(Math.random() * num);
+      const b = num - a;
+      expr = `${a} + ${b}`;
+      break;
+    }
+    case '-': {
+      const a = Math.floor(Math.random() * 50) + num;
+      const b = a - num;
+      expr = `${a} - ${b}`;
+      break;
+    }
+    case '*': {
+      const factors = [];
+      for (let i = 1; i <= Math.abs(num); i++) {
+        if (num % i === 0) factors.push(i);
+      }
+      const a = factors[Math.floor(Math.random() * factors.length)];
+      const b = num / a;
+      expr = `${a} * ${b}`;
+      break;
+    }
+    case '/': {
+      const b = Math.floor(Math.random() * 10) + 1;
+      const a = num * b;
+      expr = `${a} / ${b}`;
+      break;
+    }
+  }
+  return expr;
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -161,13 +200,10 @@ export default {
       const decodedStr = GetRandomString(4);
       const fnStr = GetRandomString(5);
       const objStr = GetRandomString(18);
-      const date = new Date();
       const script = `
-      print("${date.getFullYear()}-${date.getMonth()}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}")
-      print(os.date("%Y-%m-%d-%H-%M-%S"))
       local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
       local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value
-      local ${fnStr}="";for _, c in ipairs({108, 111, 97, 100, 115, 116, 114, 105, 110, 103}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", ${objStr}))()`;
+      local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(99)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", ${objStr}))()`;
       
       return new Response(script, {
         headers: { "Content-Type": "text/plain" }
