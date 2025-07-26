@@ -195,13 +195,13 @@ export default {
       }
 
       const textContent = await resp.text();
-      const content = `--${data.Key}\nEnableFunctions = true\ngame:GetService("ReplicatedStorage"):WaitForChild("${data.Name}").Value = tostring(math.random(1000000, 10000000))\n${textContent}`;
+      const content = `--${data.Key}\ngame:GetService("ReplicatedStorage"):WaitForChild("${data.Name}").Value = tostring(math.random(1000000, 10000000))\n${textContent}`;
       const encoded = EncodeScript(content, String(data.Key));
       const decodedStr = GetRandomString(4);
       const fnStr = GetRandomString(5);
       const objStr = GetRandomString(18);
       const script = `
-      local functions = {rconsoleprint, print, warn, error, setclipboard, writefile, appendfile, delfile, readfile, isfile, isfolder, listfiles, getcustomasset, rconsoleerr, rconsolewarn, makefolder } EnableFunctions = false for i, v in next, functions do local old old = hookfunction(v, function(...) if not EnableFunctions then local args = {...} for i, arg in next, args do if tostring(i):find("${data.Key}") or tostring(arg):find("${data.Key}") or tostring(i):find("local") or tostring(arg):find("local") then game.Players.LocalPlayer:Kick("Hook Function Detected!") end end end return old(...) end) end
+      local functions = {rconsoleprint, print, warn, error, setclipboard, writefile, appendfile, delfile, readfile, isfile, isfolder, listfiles, getcustomasset, rconsoleerr, rconsolewarn, makefolder } local EnableFunctions = false for i, v in next, functions do local old old = hookfunction(v, function(...) if not EnableFunctions then local args = {...} for i, arg in next, args do if tostring(i):find("local") or tostring(arg):find("local") then game.Players.LocalPlayer:Kick("Hook Function Detected!") end end end return old(...) end) end
       local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
       local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value
       local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", ${objStr}))() EnableFunctions = true`;
