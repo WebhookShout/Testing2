@@ -147,10 +147,10 @@ function GetNumberWithMath(num) {
 }
 
 // Encode Hash Code 'Md5' Function
-function EncodeHashCode(str) {
-  const response = await fetch(`https://api.hashify.net/hash/md5/hex?value=${str}`);
-  const json = await response.json();
-  return json.Digest;
+async function EncodeHashCode(str) {
+  const response = await fetch(`https://api.hashify.net/hash/md5/hex?value=${encodeURIComponent(str)}`);
+  const data = await response.json();
+  return data.Digest;
 }
 
 
@@ -211,8 +211,9 @@ export default {
       const date = new Date();
       const pad = n => n.toString().padStart(2, '0');
       const time = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+      const hash = await EncodeHashCode(time);
       const script = `
-      print("${EncodeHashCode(time)}")
+      print("${hash}")
       print(game:GetService("HttpService"):JSONDecode(game:HttpGet("https://api.hashify.net/hash/md5/hex?value="..os.date("%Y%m%d%H%M")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60))).Digest)
       local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
       local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value
