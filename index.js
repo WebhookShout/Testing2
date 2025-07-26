@@ -158,13 +158,13 @@ export default {
       const textContent = await resp.text();
       const content = `game:GetService("ReplicatedStorage"):WaitForChild("${data.Name}").Value = tostring(math.random(1000000, 10000000))\n${textContent}`;
       const encoded = EncodeScript(content, String(data.Key));
-      const decodedStr = GetRandomString(Math.floor(Math.random() * 5) + 3);
-      //const fnStr = GetRandomName();
+      const decodedStr = GetRandomString(Math.floor(Math.random() * 1) + 3);
+      const fnStr = GetRandomString(Math.floor(Math.random() * 2) + 3);
       //const objStr = GetRandomName();
       const script = `
       local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
       local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local obj = a[b](a, c)["${data.Name}"].Value
-      local fn="";for _, c in ipairs({108, 111, 97, 100, 115, 116, 114, 105, 110, 103}) do fn=fn..string.char(c);end(getfenv()[fn] or _G[fn] or _ENV and _ENV[fn])(${decodedStr}("${encoded}", obj))()`;
+      local ${fnStr}="";for _, c in ipairs({108, 111, 97, 100, 115, 116, 114, 105, 110, 103}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", obj))()`;
       
       return new Response(script, {
         headers: { "Content-Type": "text/plain" }
