@@ -148,9 +148,12 @@ function GetNumberWithMath(num) {
 
 // Encode Hash Code 'Md5' Function
 async function EncodeHashCode(str) {
-  const response = await fetch(`https://api.hashify.net/hash/md5/hex?value=${encodeURIComponent(str)}`);
-  const data = await response.json();
-  return data.Digest;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(str);
+  const hashBuffer = await crypto.subtle.digest("MD5", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hex = hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+  return hex;
 }
 
 
