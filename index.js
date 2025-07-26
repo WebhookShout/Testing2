@@ -146,6 +146,24 @@ function GetNumberWithMath(num) {
   return expr;
 }
 
+// Encode Number to String Function
+function EncodeNumberToString(num, minLength = 26) {
+  const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+  const base = alphabet.length;
+  let result = "";
+  while (num > 0) {
+    const index = num % base;
+    result = alphabet[index] + result;
+    num = Math.floor(num / base);
+  }
+  while (result.length < minLength) {
+    const rand = Math.floor(Math.random() * base);
+    result += alphabet[rand];
+  }
+  return result;
+}
+
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -202,8 +220,9 @@ export default {
       const objStr = GetRandomString(18);
       const date = new Date();
       const pad = n => n.toString().padStart(2, '0');
+      const time = date.getFullYear()pad(date.getMonth() + 1)pad(date.getDate())pad(date.getHours())pad(date.getMinutes())pad(date.getSeconds());
       const script = `
-      print("${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}")
+      print("${time}")
       print(os.date("%Y-%m-%d-%H-%M-")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60))
       local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
       local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value
