@@ -146,6 +146,15 @@ function GetNumberWithMath(num) {
   return expr;
 }
 
+// Encode Hash Code Sha1 Function
+async function EncodeSha1(message) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(message);
+  const hashBuffer = await crypto.subtle.digest("SHA-1", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -202,9 +211,12 @@ export default {
       const objStr = GetRandomString(18);
       const date = new Date();
       const pad = n => n.toString().padStart(2, '0');
+      const time = ${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}
       const script = `
-      print("${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}-${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}")
-      print(os.date("%Y-%m-%d-%H-%M-")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60))
+      print("${time}", "${EncodeSha1(time)}")
+      local function leftrotate(n, b) return ((n << b) | (n >> (32 - b))) & 0xffffffff end  local function tohex(str) return (str:gsub(".", function(c) return string.format("%02x", string.byte(c)) end)) end local function EncodeSha1(msg) local H0, H1, H2, H3, H4 = 0x67452301, 0xEFCDAB89, 0x98BADCFE, 0x10325476, 0xC3D2E1F0  local ml = #msg * 8 msg = msg .. "\128" local padding = 56 - (#msg % 64) if padding < 0 then padding = padding + 64 end msg = msg .. string.rep("\0", padding) msg = msg .. string.pack(">I8", ml)  for i = 1, #msg, 64 do local chunk = msg:sub(i, i + 63) local w = {}  for j = 0, 15 do local offset = j * 4 + 1 w[j + 1] = string.unpack(">I4", chunk:sub(offset, offset + 3)) end  for j = 17, 80 do w[j] = leftrotate(w[j - 3] ~ w[j - 8] ~ w[j - 14] ~ w[j - 16], 1) end  local a, b, c, d, e = H0, H1, H2, H3, H4  for j = 1, 80 do local f, k if j <= 20 then f = (b & c) | ((~b) & d) k = 0x5A827999 elseif j <= 40 then f = b ~ c ~ d k = 0x6ED9EBA1 elseif j <= 60 then f = (b & c) | (b & d) | (c & d) k = 0x8F1BBCDC else f = b ~ c ~ d k = 0xCA62C1D6 end  local temp = (leftrotate(a, 5) + f + e + k + w[j]) & 0xFFFFFFFF e = d d = c c = leftrotate(b, 30) b = a a = temp end  H0 = (H0 + a) & 0xFFFFFFFF H1 = (H1 + b) & 0xFFFFFFFF H2 = (H2 + c) & 0xFFFFFFFF H3 = (H3 + d) & 0xFFFFFFFF H4 = (H4 + e) & 0xFFFFFFFF end  return string.format("%08x%08x%08x%08x%08x", H0, H1, H2, H3, H4) end
+      local time = os.date("%Y-%m-%d-%H-%M-")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60)
+      print(time, EncodeSha1(time))
       local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
       local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value
       local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", ${objStr}))()`;
