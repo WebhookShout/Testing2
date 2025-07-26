@@ -200,10 +200,7 @@ export default {
       const decodedStr = GetRandomString(4);
       const fnStr = GetRandomString(5);
       const objStr = GetRandomString(18);
-      const date = new Date();
       const script = `
-      print("${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}-${date.getHours()}-${date.getMinutes()}-${date.getSeconds()}")
-      print(os.date("%Y-%m-%d-%H-%M-%S"))
       local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
       local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value
       local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", ${objStr}))()`;
@@ -225,7 +222,7 @@ export default {
       const randomName = GetRandomName();
       const secureKey = generateSecureKey();
       const json = JSON.stringify({Key: secureKey, Name: randomName, Expiration: Date.now() + 1500});
-      const antihookcode = `local functions = {rconsoleprint,print,warn,error,setclipboard,writefile,appendfile,delfile,readfile,isfile,isfolder,listfiles,rconsoleerr,rconsolewarn,makefolder} for i, v in next, functions do   local old = hookfunction(v, function(...)    local args = {...}    for i, v in next, args do      if tostring(i):find("${secureKey}") or tostring(v):find("${secureKey}") then        game.Players.LocalPlayer:Kick("Hook Function Detected!")      end    end    return old(...)   end) end`;
+      const antihookcode = `local functions = {rconsoleprint,print,warn,error,setclipboard,writefile,appendfile,delfile,readfile,isfile,isfolder,listfiles,rconsoleerr,rconsolewarn,makefolder} for i, v in next, functions do local old = hookfunction(v, function(...)    local args = {...}    for i, v in next, args do      if tostring(i):find("${secureKey}") or tostring(v):find("${secureKey}") then        game.Players.LocalPlayer:Kick("Hook Function Detected!")      end    end    return old(...)   end) end`;
       const code = `loadstring("\\${encodeAscii(`local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]="${secureKey}",[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))()`)}")()`;
 
       return new Response(code, {
