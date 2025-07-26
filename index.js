@@ -151,11 +151,10 @@ function EncodeNumberToString(num) {
   const alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
   const base = alphabet.length;
   let result = "";
-  num = BigInt(num);
-  while (num > 0n) {
-    const index = Number(num % BigInt(base));
+  while (num > 0) {
+    const index = num % base;
     result = alphabet[index] + result;
-    num = num / BigInt(base);
+    num = Math.floor(num / base);
   }
   return result || "a";
 }
