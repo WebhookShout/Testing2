@@ -182,7 +182,7 @@ export default {
 
       // Detect if data decoded error
       if (!data || typeof data !== 'object' || !('Expiration' in data)) {
-        // return new Response(`404: Not Found`, { status: 404 });
+         return new Response(`404: Not Found`, { status: 404 });
       }
       
       // Detect if Access ID is Expired
