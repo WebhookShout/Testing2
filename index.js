@@ -214,7 +214,7 @@ export default {
     // Authorize Specific Key
     if (pathname) {
       const key = pathname;
-      const linkData = links[key];
+      const linkData = links[key].replace(/\r?\n/g, ';');
 
       if (!linkData) {
         return new Response(`404: Not Found`, { status: 404 });
