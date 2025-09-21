@@ -173,7 +173,7 @@ export default {
     // Handle Access Scripts
     if (pathname && auth) {
       const key = pathname;
-      const linkData = links[key];
+      const linkData = links[key].replace(/\r?\n/g, ';');
       const data = JSON.parse(DecodeText(auth, ServiceKey));
       
       if (!linkData) {
