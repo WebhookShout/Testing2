@@ -212,14 +212,7 @@ export default {
     }
 
     // Authorize Specific Key
-    if (pathname) {
-      const key = pathname;
-      const linkData = links[key];
-
-      if (!linkData) {
-        return new Response(`404: Not Found`, { status: 404 });
-      }
-
+    if (pathname && links[pathname]) {
       const randomName = GetRandomName();
       const secureKey = generateSecureKey();
       const json = JSON.stringify({Key: secureKey, Name: randomName, Expiration: Date.now() + 5000});
