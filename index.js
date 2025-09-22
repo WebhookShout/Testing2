@@ -230,7 +230,7 @@ export default {
       
       const code = `
       --KEY = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://api.hashify.net/hash/md5/hex?value="..math.floor(game:GetService("HttpService"):JSONDecode(game:HttpGet("http://worldclockapi.com/api/json/utc/now")).currentFileTime / 10000000)) + 1).Digest
-      time = math.floor(game:GetService("HttpService"):JSONDecode(game:HttpGet("http://worldclockapi.com/api/json/utc/now")).currentFileTime / 10000000 + 1)
+      time = math.floor(game:GetService("HttpService"):JSONDecode(game:HttpGet("http://worldclockapi.com/api/json/utc/now")).currentFileTime / 10000000 - 2)
       print(time)
       print("${flooredTime}")
       
