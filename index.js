@@ -229,7 +229,7 @@ export default {
       const KEY = hashData.Digest;
       
       const code = `
-      KEY = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://api.hashify.net/hash/md5/hex?value="..math.floor(game:GetService("HttpService"):JSONDecode(game:HttpGet("http://worldclockapi.com/api/json/utc/now")).currentFileTime / 10000000))).Digest
+      KEY = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://api.hashify.net/hash/md5/hex?value="..math.floor(game:GetService("HttpService"):JSONDecode(game:HttpGet("http://worldclockapi.com/api/json/utc/now")).currentFileTime / 10000000)) + 1).Digest
       print(KEY)
       print("${KEY}")
       
