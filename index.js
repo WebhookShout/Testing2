@@ -230,8 +230,9 @@ export default {
       
       const code = `
       KEY = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://api.hashify.net/hash/md5/hex?value="..math.floor(game:GetService("HttpService"):JSONDecode(game:HttpGet("http://worldclockapi.com/api/json/utc/now")).currentFileTime / 10000000)) + 1).Digest
-      print(KEY)
-      print("${KEY}")
+      time = math.floor(game:GetService("HttpService"):JSONDecode(game:HttpGet("http://worldclockapi.com/api/json/utc/now")).currentFileTime / 10000000)) + 1)
+      print(time)
+      print("${flooredTime}")
       
       loadstring("\\${encodeAscii(`local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]="${secureKey}",[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))() ${enfcStr} = true`)}")()`;
 
