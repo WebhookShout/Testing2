@@ -153,7 +153,7 @@ export default {
     const domain = url.origin; // get service full link
     const userAgent = request.headers.get('User-Agent') || ''; // get User-Agent
     const path = url.pathname.split("/").filter(Boolean); // specific path 'path[1]' https://my.cloudflare/path0/path1
-    const auth = url.searchParams.get("auth"); // get key in '?auth=Key'
+    const auth = path[2];
 
     // Detect if request UserAgent is not include "Roblox"
     if (!userAgent.includes('Roblox')) {
@@ -201,8 +201,8 @@ export default {
       const fnctblStr = GetRandomString(9);
         
       const textContent = await resp.text();
-      const content = `${enfcStr} = true\n${textContent}`;
-      const encoded = EncodeScript(content, String(path[1]));
+      const content = `${enfcStr} = true\nKEY = nil\n${textContent}`;
+      const encoded = EncodeScript(content, String(path[3]));
       const script = `local ${fnctblStr} = {rconsoleprint,print,warn,error,setclipboard,writefile,appendfile,delfile,readfile,isfile,isfolder,listfiles,getcustomasset,rconsoleerr,rconsolewarn,makefolder} ${enfcStr} = false for i, v in next, ${fnctblStr} do local old old = hookfunction(v, function(...) if not ${enfcStr} then local args = {...} for i, arg in next, args do if tostring(i):find("${enfcStr}") or tostring(arg):find("${enfcStr}") then game.Players.LocalPlayer:Kick("Hook Detected!") return nil end end end return old(...) end) end local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])((function(str, key) local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end  return ${decodedStr}(str, key) end)("${encoded}", KEY))()`;
       
       return new Response(script, {
@@ -213,7 +213,7 @@ export default {
     // Authorize Specific Key
     if (path[0]) {
       const key = path[0];
-      const linkData = links[key].replace(/\r?\n/g, ';');
+      const linkData = links[key];
 
       if (!linkData) {
         return new Response(`404: Not Found`, { status: 404 });
@@ -224,7 +224,7 @@ export default {
       const enfcStr = GetRandomString(10);
       const fnctblStr = GetRandomString(9);
       const antihookcode = `local ${fnctblStr} = {rconsoleprint,print,warn,error,setclipboard,writefile,appendfile,delfile,readfile,isfile,isfolder,listfiles,getcustomasset,rconsoleerr,rconsolewarn,makefolder} local ${enfcStr} = false for i, v in next, ${fnctblStr} do local old old = hookfunction(v, function(...) if not ${enfcStr} then local args = {...} for i, arg in next, args do if tostring(i):find("${fnctblStr}") or tostring(arg):find("${fnctblStr}") then game.Players.LocalPlayer:Kick("Hook Detected!") return nil end end end return old(...) end) end`;
-      const code = `loadstring("\\${encodeAscii(`KEY = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://api.hashify.net/hash/md5/hex?value="..math.floor(game:GetService("HttpService"):JSONDecode(game:HttpGet("http://worldclockapi.com/api/json/utc/now")).currentFileTime / 10000000))).Digest ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}/"..KEY.."?auth=${EncodeText(json, ServiceKey)}"))() ${enfcStr} = true`)}")()`;
+      const code = `loadstring("\\${encodeAscii(`KEY = game:GetService("HttpService"):JSONDecode(game:HttpGet("https://api.hashify.net/hash/md5/hex?value="..math.floor(game:GetService("HttpService"):JSONDecode(game:HttpGet("http://worldclockapi.com/api/json/utc/now")).currentFileTime / 10000000))).Digest ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}/${EncodeText(json, ServiceKey)}/"..KEY))() ${enfcStr} = true`)}")()`;
 
       return new Response(code, {
         headers: { "Content-Type": "text/plain" }
