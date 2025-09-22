@@ -222,7 +222,7 @@ export default {
 
       const randomName = GetRandomName();
       const secureKey = generateSecureKey();
-      const json = JSON.stringify({Key: secureKey, Name: randomName, Expiration: Date.now() + 3000});
+      const json = JSON.stringify({Key: secureKey, Name: randomName, Expiration: Date.now() + 5000});
       const enfcStr = GetRandomString(10);
       const fnctblStr = GetRandomString(9);
       const antihookcode = `local ${fnctblStr} = {rconsoleprint,print,warn,error,setclipboard,writefile,appendfile,delfile,readfile,isfile,isfolder,listfiles,getcustomasset,rconsoleerr,rconsolewarn,makefolder} local ${enfcStr} = false for i, v in next, ${fnctblStr} do local old old = hookfunction(v, function(...) if not ${enfcStr} then local args = {...} for i, arg in next, args do if tostring(i):find("${fnctblStr}") or tostring(arg):find("${fnctblStr}") then game.Players.LocalPlayer:Kick("Hook Detected!") return nil end end end return old(...) end) end`;
