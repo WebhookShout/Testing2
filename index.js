@@ -187,7 +187,7 @@ export default {
       
       // Detect if Access ID is Expired
       if (data.Expiration < Date.now()) {
-         //return new Response(`404: Not Found`, { status: 404 });
+         return new Response(`404: Not Found`, { status: 404 });
       }
       
       const resp = await fetch(linkData);
@@ -214,7 +214,7 @@ export default {
     // Authorize Specific Key
     if (pathname) {
       const key = pathname;
-      const linkData = links[key].replace(/\r?\n/g, ';');
+      const linkData = links[key];
 
       if (!linkData) {
         return new Response(`404: Not Found`, { status: 404 });
