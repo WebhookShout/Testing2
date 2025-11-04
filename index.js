@@ -72,12 +72,8 @@ function GetRandomName() {
 }
 
 // Generate Secured Key Function
-async function generateSecureKey() {
-  const timestamp = Number(String(Math.floor(Date.now() / 1000)).slice(0, 9));
-  const res = await fetch(`https://api.hashify.net/hash/md5/hex?value=${timestamp}`);
-  const data = await res.json();
-  const digest = data.Digest;
-  return digest; // returns the encoded digest silently
+function generateSecureKey() {
+  return Number(String(Math.floor(Date.now() / 1000)).slice(0, 9));
 }
 
 // Encode Ascii Function
@@ -219,7 +215,7 @@ export default {
       const enfcStr = GetRandomString(10);
       const fnctblStr = GetRandomString(9);
       const antihookcode = `local ${fnctblStr} = {rconsoleprint,print,warn,error,setclipboard,writefile,appendfile,delfile,readfile,isfile,isfolder,listfiles,getcustomasset,rconsoleerr,rconsolewarn,makefolder} local ${enfcStr} = false for i, v in next, ${fnctblStr} do local old old = hookfunction(v, function(...) if not ${enfcStr} then local args = {...} for i, arg in next, args do if tostring(i):find("${fnctblStr}") or tostring(arg):find("${fnctblStr}") then game.Players.LocalPlayer:Kick("Hook Detected!") return nil end end end return old(...) end) end`;
-      const code = `loadstring("\\${encodeAscii(`local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]=game.HttpService:JSONDecode(game:HttpGet("https://api.hashify.net/hash/md5/hex?value="..tostring(os.time()):sub(1,9))),[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))() ${enfcStr} = true`)}")()`;
+      const code = `loadstring("\\${encodeAscii(`local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]=tostring(os.time()):sub(1,9),[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))() ${enfcStr} = true`)}")()`;
 
       return new Response(code, {
         headers: { "Content-Type": "text/plain" }
