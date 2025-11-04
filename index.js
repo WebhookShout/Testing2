@@ -72,8 +72,19 @@ function GetRandomName() {
 }
 
 // Generate Secured Key Function
-function generateSecureKey() {
-  return Number(String(Math.floor(Date.now() / 1000)).slice(0, 9));
+function generateSecureKey(length = 32, segmentLength = 4) {
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const array = new Uint8Array(length);
+  crypto.getRandomValues(array);
+
+  let key = '';
+  for (let i = 0; i < array.length; i++) {
+    key += chars[array[i] % chars.length];
+    if ((i + 1) % segmentLength === 0 && i + 1 !== array.length) {
+      key += '-';
+    }
+  }
+  return key;
 }
 
 // Encode Ascii Function
@@ -215,7 +226,7 @@ export default {
       const enfcStr = GetRandomString(10);
       const fnctblStr = GetRandomString(9);
       const antihookcode = `local ${fnctblStr} = {rconsoleprint,print,warn,error,setclipboard,writefile,appendfile,delfile,readfile,isfile,isfolder,listfiles,getcustomasset,rconsoleerr,rconsolewarn,makefolder} local ${enfcStr} = false for i, v in next, ${fnctblStr} do local old old = hookfunction(v, function(...) if not ${enfcStr} then local args = {...} for i, arg in next, args do if tostring(i):find("${fnctblStr}") or tostring(arg):find("${fnctblStr}") then game.Players.LocalPlayer:Kick("Hook Detected!") return nil end end end return old(...) end) end`;
-      const code = `loadstring("\\${encodeAscii(`${randomName} = tostring(os.time()):sub(1,9) ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))() ${enfcStr} = true`)}")()`;
+      const code = `loadstring("\\${encodeAscii(`${randomName} = "${secureKey}" ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))() ${enfcStr} = true`)}")()`;
 
       return new Response(code, {
         headers: { "Content-Type": "text/plain" }
