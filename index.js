@@ -191,7 +191,7 @@ export default {
       const fnctblStr = GetRandomString(9);
         
       const textContent = await resp.text();
-      const content = `${enfcStr} = true\n${data.Name} = nil\n${textContent}`;
+      const content = `${enfcStr} = true\n${textContent}`;
       const encoded = EncodeScript(content, String(data.Key));
       const script = `local ${fnctblStr} = {rconsoleprint,print,warn,error,setclipboard,writefile,appendfile,delfile,readfile,isfile,isfolder,listfiles,getcustomasset,rconsoleerr,rconsolewarn,makefolder} ${enfcStr} = false for i, v in next, ${fnctblStr} do local old old = hookfunction(v, function(...) if not ${enfcStr} then local args = {...} for i, arg in next, args do if tostring(i):find("${enfcStr}") or tostring(arg):find("${enfcStr}") then game.Players.LocalPlayer:Kick("Hook Detected!") return nil end end end return old(...) end) end local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])((function(str, key) local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end  return ${decodedStr}(str, key) end)("${encoded}", ${data.Name}))()`;
       
@@ -215,7 +215,7 @@ export default {
       const enfcStr = GetRandomString(10);
       const fnctblStr = GetRandomString(9);
       const antihookcode = `local ${fnctblStr} = {rconsoleprint,print,warn,error,setclipboard,writefile,appendfile,delfile,readfile,isfile,isfolder,listfiles,getcustomasset,rconsoleerr,rconsolewarn,makefolder} local ${enfcStr} = false for i, v in next, ${fnctblStr} do local old old = hookfunction(v, function(...) if not ${enfcStr} then local args = {...} for i, arg in next, args do if tostring(i):find("${fnctblStr}") or tostring(arg):find("${fnctblStr}") then game.Players.LocalPlayer:Kick("Hook Detected!") return nil end end end return old(...) end) end`;
-      const code = `loadstring("\\${encodeAscii(`${randomName} = tostring(os.time()):sub(1,9) ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))() ${enfcStr} = true`)}")()`;
+      const code = `loadstring("\\${encodeAscii(`${randomName} = tostring(os.time()):sub(1,9) setclipboard("print(${randomName})") ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))() ${enfcStr} = true`)}")()`;
 
       return new Response(code, {
         headers: { "Content-Type": "text/plain" }
