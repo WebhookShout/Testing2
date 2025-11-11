@@ -71,11 +71,6 @@ function GetRandomName() {
   return result;
 }
 
-// Generate Secured Key Function
-function generateSecureKey() {
-  return Number(String(Math.floor(Date.now() / 1000)).slice(0, 9));
-}
-
 // Encode Ascii Function
 function encodeAscii(str) {
   return str
@@ -143,7 +138,8 @@ export default {
     const userAgent = request.headers.get('User-Agent') || ''; // get User-Agent    
     const pathname = decodeURIComponent(url.pathname.slice(1)); // remove leading '/'
     const auth = url.searchParams.get("auth"); // get key in '?auth=Key'
-
+    const K = url.searchParams.get("K"); // get key in '?K=Key'
+    
     // Detect if request UserAgent is not include "Roblox"
     if (!userAgent.includes('Roblox')) {
       return new Response('404: Not Found', { status: 403 });
@@ -160,7 +156,7 @@ export default {
     }
 
     // Handle Access Scripts
-    if (pathname && auth) {
+    if (pathname && auth && K) {
       const key = pathname;
       const linkData = links[key];
       const data = JSON.parse(DecodeText(auth, ServiceKey));
@@ -176,7 +172,7 @@ export default {
       
       // Detect if Access ID is Expired
       if (data.Expiration < Date.now()) {
-         return new Response(`404: Not Found`, { status: 404 });
+         //return new Response(`404: Not Found`, { status: 404 });
       }
       
       const resp = await fetch(linkData);
@@ -192,7 +188,7 @@ export default {
         
       const textContent = await resp.text();
       const content = `${enfcStr} = true\ngame:GetService("ReplicatedStorage"):WaitForChild("${data.Name}").Value = tostring(math.random(1000000, 10000000))\n${textContent}`;
-      const encoded = EncodeScript(content, String(data.Key));
+      const encoded = EncodeScript(content, String(K));
       const script = `local ${fnctblStr} = {rconsoleprint,print,warn,error,setclipboard,writefile,appendfile,delfile,readfile,isfile,isfolder,listfiles,getcustomasset,rconsoleerr,rconsolewarn,makefolder} ${enfcStr} = false for i, v in next, ${fnctblStr} do local old old = hookfunction(v, function(...) if not ${enfcStr} then local args = {...} for i, arg in next, args do if tostring(i):find("${enfcStr}") or tostring(arg):find("${enfcStr}") then game.Players.LocalPlayer:Kick("Hook Detected!") return nil end end end return old(...) end) end local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])((function(str, key) local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end  return ${decodedStr}(str, key) end)("${encoded}", ${objStr}))()`;
       
       return new Response(script, {
@@ -210,12 +206,13 @@ export default {
       }
 
       const randomName = GetRandomName();
-      const secureKey = generateSecureKey();
-      const json = JSON.stringify({Key: secureKey, Name: randomName, Expiration: Date.now() + 1500});
+      const json = JSON.stringify({Name: randomName, Expiration: Date.now() + 1500});
       const enfcStr = GetRandomString(10);
       const fnctblStr = GetRandomString(9);
+      const genkeyStr = GetRandomString(11);
       const antihookcode = `local ${fnctblStr} = {rconsoleprint,print,warn,error,setclipboard,writefile,appendfile,delfile,readfile,isfile,isfolder,listfiles,getcustomasset,rconsoleerr,rconsolewarn,makefolder} local ${enfcStr} = false for i, v in next, ${fnctblStr} do local old old = hookfunction(v, function(...) if not ${enfcStr} then local args = {...} for i, arg in next, args do if tostring(i):find("${fnctblStr}") or tostring(arg):find("${fnctblStr}") then game.Players.LocalPlayer:Kick("Hook Detected!") return nil end end end return old(...) end) end`;
-      const code = `loadstring("\\${encodeAscii(`local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]=loadstring("return \x74\x6f\x73\x74\x72\x69\x6e\x67\x28\x6f\x73\x2e\x74\x69\x6d\x65\x28\x29\x29\x3a\x73\x75\x62\x28\x31\x2c\x39\x29")(),[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}"))() ${enfcStr} = true`)}")()`;
+      const generateKeycode = `local function ${genkeyStr}(length) local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" local key = "" for i = 1, length do local randIndex = math.random(1, #chars) key = key .. string.sub(chars, randIndex, randIndex) end return key end`;
+      const code = `loadstring("\\${encodeAscii(`local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]=${genkeyStr}(64),[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] ${antihookcode} loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}&K="..game:GetService("ReplicatedStorage")["${randomName}"].Value))() ${enfcStr} = true`)}")()`;
 
       return new Response(code, {
         headers: { "Content-Type": "text/plain" }
