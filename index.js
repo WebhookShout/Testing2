@@ -139,11 +139,6 @@ export default {
     const pathname = decodeURIComponent(url.pathname.slice(1)); // remove leading '/'
     const auth = url.searchParams.get("auth"); // get key in '?auth=Key'
     const K = url.searchParams.get("K"); // get key in '?K=Key'
-    
-    // Detect if request UserAgent is not include "Roblox"
-    if (!userAgent.includes('Roblox')) {
-      return new Response('404: Not Found', { status: 403 });
-    }
 
     let links = {};
     try {
