@@ -1,4 +1,4 @@
-const ScriptsLink = "https://ghost352.neocities.org/RobloxScripts/ScriptsTable/Links.json";
+const ScriptsLink = "https://ghost352.neocities.org/RobloxScripts/ScriptsTable/Links2.json";
 const ServiceKey = "AdRa-hXtp-44pk-uopl-cVIp-QdG1-Dnh1-adO0-russ-1ov3";
 
 //-- Encode Decode Word Function
@@ -151,8 +151,7 @@ export default {
 
     // Handle Access Scripts
     if (pathname && auth && K) {
-      const key = pathname;
-      const linkData = links[key];
+      const linkData = links[pathname].url;
       const data = JSON.parse(DecodeText(auth, ServiceKey));
       
       if (!linkData) {
@@ -189,8 +188,12 @@ export default {
 
     // Authorize Specific Key
     if (pathname) {
-      const key = pathname;
-      const linkData = links[key];
+      let linkData
+      for (const key in links) {
+        if (links[key].hash === pathname) {
+          linkData = links[key];
+        }
+      }
 
       if (!linkData) {
         return new Response(`404: Not Found`, { status: 404 });
