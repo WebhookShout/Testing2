@@ -198,7 +198,7 @@ export default {
       }
 
       const randomName = GetRandomName();
-      const json = JSON.stringify({Name: randomName, Expiration: Date.now() + 1500});
+      const json = JSON.stringify({Name: randomName, Expiration: Date.now() + 3500});
       const genkeyStr = GetRandomString(11);
       const antihookcode = await fetch("https://raw.githubusercontent.com/MainScripts352/MainScripts352/refs/heads/main/Anti%20Hook%20Source");
       const generatekeycode = `local function ${genkeyStr}(length) local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" local key = "" for i = 1, length do local randIndex = math.random(1, #chars) key = key .. string.sub(chars, randIndex, randIndex) end return key end`;
