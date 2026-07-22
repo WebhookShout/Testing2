@@ -1,4 +1,4 @@
-name = "roblox-script-security"
+name = "anti-httpspy"
 main = "index.js"
 compatibility_date = "2025-07-05"
 workers_dev = true
