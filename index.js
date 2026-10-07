@@ -189,7 +189,7 @@ export default {
     }
 
     // Authorize Specific Key
-    if (pathname) {
+    if (pathname) { 
       const key = pathname;
       const linkData = links[key];
 
