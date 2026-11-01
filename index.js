@@ -1,4 +1,4 @@
-const ScriptsLink = "https://ghost352.neocities.org/RobloxScripts/ScriptsTable/Links.json";
+const ScriptsLink = "https://roblox-scripts-dns.pages.dev/";
 const ServiceKey = "AdRa-hXtp-44pk-uopl-cVIp-QdG1-Dnh1-adO0-russ-1ov3";
 
 //-- Encode Decode Word Function
@@ -140,15 +140,7 @@ export default {
     const auth = url.searchParams.get("auth"); // get key in '?auth=Key'
     const K = url.searchParams.get("K"); // get key in '?K=Key'
 
-    let links = {};
-    try {
-      const jsonUrl = ScriptsLink;
-      const response = await fetch(jsonUrl);
-      if (!response.ok) throw new Error('Non-200 response');
-      links = await response.json();
-    } catch (e) {
-      return new Response("Failed to fetch JSON.", { status: 500 });
-    }
+    
 
     // Handle Access Scripts
     if (pathname && auth && K) {
@@ -190,15 +182,8 @@ export default {
 
     // Authorize Specific Key
     if (pathname) {
-      const key = pathname;
-      const linkData = links[key];
-
-      if (!linkData) {
-        return new Response(`404: Not Found`, { status: 404 });
-      }
-
       const randomName = GetRandomName();
-      const json = JSON.stringify({Name: randomName, Expiration: Date.now() + 3500});
+      const json = JSON.stringify({ Name: randomName, Expiration: Date.now() + 3500 });
       const genkeyStr = GetRandomString(11);
       const antihookcode = await fetch("https://raw.githubusercontent.com/MainScripts352/MainScripts352/refs/heads/main/Anti%20Hook%20Source");
       const generatekeycode = `local function ${genkeyStr}(length) local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" local key = "" for i = 1, length do local randIndex = math.random(1, #chars) key = key .. string.sub(chars, randIndex, randIndex) end return key end`;
