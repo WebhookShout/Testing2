@@ -145,10 +145,15 @@ export default {
     // Handle Access Scripts
     if (pathname && auth && K) {
       const key = pathname;
-      const linkData = links[key];
+      const req_data = await fetch(ScriptsLink + key + ".lua");     
+      const script = await req_data.text();
       const data = JSON.parse(DecodeText(auth, ServiceKey));
+
+      if (!req_data.ok) {
+        return new Response(`${req_data.status}: Failed to fetch content`, { status: 500 });
+      }
       
-      if (!linkData) {
+      if (!script) {
         return new Response(`404: Not Found`, { status: 404 });
       }
 
@@ -160,22 +165,17 @@ export default {
       // Detect if Access ID is Expired
       if (data.Expiration < Date.now()) {
          return new Response(`404: Not Found`, { status: 404 });
-      }
-      
-      const resp = await fetch(linkData);
-      if (!resp.ok) {
-        return new Response(`${resp.status}: Failed to fetch content`, { status: 500 });
-      }
+      }    
 
-      const textContent = await resp.text();
+      
       const decodedStr = GetRandomString(4);
       const fnStr = GetRandomString(5);
       const objStr = GetRandomString(18);
-      const content = `game:GetService("ReplicatedStorage"):WaitForChild("${data.Name}").Value = math.random(1, 1000000000)\n${textContent}`;
+      const content = `game:GetService("ReplicatedStorage"):WaitForChild("${data.Name}").Value = math.random(1, 1000000000)\n${script}`;
       const encoded = EncodeScript(content, String(K));
-      const script = `local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])((function(str, key) local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end  return ${decodedStr}(str, key) end)("${encoded}", ${objStr}))()`;
+      const payload = `local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])((function(str, key) local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end  return ${decodedStr}(str, key) end)("${encoded}", ${objStr}))()`;
       
-      return new Response(script, {
+      return new Response(payload, {
         headers: { "Content-Type": "text/plain" }
       });
     }
