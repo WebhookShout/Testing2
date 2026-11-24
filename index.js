@@ -1316,6 +1316,7 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
+/*
 export default {
   async fetch(request) {
     if (request.method === 'OPTIONS') {
@@ -1392,7 +1393,7 @@ export default {
   },
 };
 
-
+*/
 
 
 
