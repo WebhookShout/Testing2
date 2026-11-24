@@ -1294,7 +1294,6 @@ function deadCode() {
 export function Obfuscate(script, options = {}) {
   return obfuscate(script, { ...DEFAULTS, ...options }).script;
 }
-
 /**
  * Same as Obfuscate(), plus the counters (strings encoded, names renamed, ...).
  *
@@ -1304,6 +1303,22 @@ export function Obfuscate(script, options = {}) {
 export function ObfuscateDetailed(script, options = {}) {
   return obfuscate(script, { ...DEFAULTS, ...options });
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 const CORS = {
