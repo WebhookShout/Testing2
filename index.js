@@ -181,7 +181,7 @@ export default {
     }
 
     // Authorize Specific Key
-    if (pathname) {
+    if (pathname) { 
       const randomName = GetRandomName();
       const json = JSON.stringify({ Name: randomName, Expiration: Date.now() + 3500 });
       const genkeyStr = GetRandomString(11);
