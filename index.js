@@ -1332,10 +1332,10 @@ export default {
     // Handle Access Scripts
     if (pathname && auth && K) {
       const key = pathname;
-      const req_data = await fetch(ScriptsLink + key + ".lua");     
-      const script = await req_data.text();
       const data = JSON.parse(DecodeText(auth, ServiceKey));
-
+      const req_data = await fetch(ScriptsLink + key + ".lua");     
+      let script = await req_data.text();
+      
       if (!req_data.ok) {
         return new Response(`${req_data.status}: Failed to fetch content`, { status: 500, headers: { "Content-Type": "text/plain", ...CORS }});
       }
