@@ -1305,97 +1305,12 @@ export function ObfuscateDetailed(script, options = {}) {
   return obfuscate(script, { ...DEFAULTS, ...options });
 }
 
-/* ------------------------------------------------------------------ */
-/* optional: drop-in worker endpoint                                  */
-/* ------------------------------------------------------------------ */
-/* Delete this block if your worker already has its own fetch handler. */
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
-
-/*
-export default {
-  async fetch(request) {
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: CORS });
-    }
-
-    if (request.method !== 'POST') {
-      return Response.json(
-        { success: false, error: 'POST the script as the body, or JSON { "script": "..." }' },
-        { status: 405, headers: CORS },
-      );
-    }
-
-    const raw = await request.text();
-
-    if (raw.length > MAX_SCRIPT_BYTES) {
-      return Response.json(
-        { success: false, error: 'script too large (max ' + MAX_SCRIPT_BYTES + ' characters)' },
-        { status: 413, headers: CORS },
-      );
-    }
-
-    let script = raw;
-    const options = {};
-
-    if ((request.headers.get('content-type') || '').includes('application/json')) {
-      let body;
-      try {
-        body = JSON.parse(raw || '{}');
-      } catch {
-        return Response.json(
-          { success: false, error: 'body is not valid JSON' },
-          { status: 400, headers: CORS },
-        );
-      }
-      script = body.script ?? body.code ?? '';
-      for (const [key, fallback] of Object.entries(DEFAULTS)) {
-        const value = body[key];
-        if (typeof fallback === 'boolean' && typeof value === 'boolean') {
-          options[key] = value;
-        } else if (
-          typeof fallback === 'number' &&
-          typeof value === 'number' &&
-          Number.isFinite(value)
-        ) {
-          options[key] = Math.max(0, Math.min(86400, Math.floor(value)));
-        }
-      }
-    }
-
-    if (typeof script !== 'string' || script.trim() === '') {
-      return Response.json(
-        { success: false, error: 'no script provided' },
-        { status: 400, headers: CORS },
-      );
-    }
-
-    const result = obfuscate(script, { ...DEFAULTS, ...options });
-
-    return Response.json(
-      {
-        success: true,
-        script: result.script,
-        encodedStrings: result.encodedStrings,
-        hiddenGlobals: result.hiddenGlobals,
-        renamedLocals: result.renamedLocals,
-        renamedFields: result.renamedFields,
-        renamedGlobals: result.renamedGlobals,
-        encodedNumbers: result.encodedNumbers,
-        maxAgeSeconds: result.maxAgeSeconds,
-      },
-      { headers: CORS },
-    );
-  },
-};
-
-*/
-
-
 
 
 export default {
@@ -1413,10 +1328,6 @@ export default {
     }
 
 
-    const result = obfuscate("print('hi')", { ...DEFAULTS });
-    return new Response(result.script, { status: 200 });
-
-    
 
     // Handle Access Scripts
     if (pathname && auth && K) {
@@ -1426,22 +1337,28 @@ export default {
       const data = JSON.parse(DecodeText(auth, ServiceKey));
 
       if (!req_data.ok) {
-        return new Response(`${req_data.status}: Failed to fetch content`, { status: 500 });
+        return new Response(`${req_data.status}: Failed to fetch content`, { status: 500, headers: { "Content-Type": "text/plain", ...CORS }});
       }
       
       if (!script) {
-        return new Response(`404: Not Found`, { status: 404 });
+        return new Response(`404: Not Found`, { status: 404, headers: { "Content-Type": "text/plain", ...CORS }});
       }
 
       // Detect if data decoded error
       if (!data || typeof data !== 'object' || !('Expiration' in data)) {
-         return new Response(`404: Not Found`, { status: 404 });
+         return new Response(`404: Not Found`, { status: 404, headers: { "Content-Type": "text/plain", ...CORS }});
       }
       
       // Detect if Access ID is Expired
       if (data.Expiration < Date.now()) {
-         return new Response(`404: Not Found`, { status: 404 });
+         return new Response(`404: Not Found`, { status: 404, headers: { "Content-Type": "text/plain", ...CORS }});
       }    
+
+
+      // Obfuscate Script
+      const result = obfuscate(script, { ...DEFAULTS });
+      script = result.script;
+      //
 
       
       const decodedStr = GetRandomString(4);
@@ -1451,8 +1368,12 @@ export default {
       const encoded = EncodeScript(content, String(K));
       const payload = `local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])((function(str, key) local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end  return ${decodedStr}(str, key) end)("${encoded}", ${objStr}))()`;
       
-      return new Response(payload, {
-        headers: { "Content-Type": "text/plain" }
+      return new Response(payload, { 
+        status: 200,
+        headers: {
+          "Content-Type": "text/plain",
+          ...CORS 
+        }
       });
     }
 
@@ -1466,10 +1387,16 @@ export default {
       const code = `${await antihookcode.text()}\nloadstring("\\${encodeAscii(`${generatekeycode} local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]=${genkeyStr}(64),[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}&K="..game:GetService("ReplicatedStorage")["${randomName}"].Value))()`)}")()`;
 
       return new Response(code, {
-        headers: { "Content-Type": "text/plain" }
+        status: 200,
+        headers: {
+          "Content-Type": "text/plain",
+          ...CORS }
       });
     }
 
-    return new Response("404: Not Found", { status: 404 });
+
+    
+
+    return new Response("404: Not Found", { status: 404, headers: { "Content-Type": "text/plain", ...CORS }});
   }
 }
