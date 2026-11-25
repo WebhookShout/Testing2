@@ -144,28 +144,46 @@ function GetNumberWithMath(num) {
 
 
 /**
- * Roblox / Luau script obfuscator — standalone library for Cloudflare Workers.
+ * Cloudflare Worker — Luau / Roblox script obfuscator (stronger build)
  *
- *   import { Obfuscate } from "./obfuscator.js";
+ * What it does to the script it is given:
+ *   1. Removes comments (-- line comments and --[[ ]] block comments).
+ *   2. Renames every local variable, function parameter and loop variable.
+ *   3. Renames table fields and global functions the script defines itself.
+ *   4. Hides builtin globals (print, game, Instance, string, ...) behind
+ *      encoded environment lookups.
+ *   5. Hides every property, method and service name — Parent, Transparency,
+ *      GetService, RunService, HttpService, JSONEncode, JSONDecode, UrlEncode,
+ *      ... — behind encoded bracket keys, including methods called on the
+ *      result of another call.
+ *   6. Encrypts every string literal with AES-128 in CTR mode, written in a
+ *      symbol-heavy alphabet ('@#$%^&*()' and friends) so the payloads read as
+ *      noise, padded to whole blocks so their length does not leak, cut into
+ *      fragments the runtime joins backwards, with decoy payloads mixed in.
+ *      Every number is encoded too: integers become arithmetic, decimals and
+ *      exponents travel as encrypted text and are parsed at run time. The AES
+ *      key is only carried RSA-encrypted and is unwrapped inside the runtime
+ *      prelude.
+ *   7. Decrypts a canary token before anything happens: if the decoder is not
+ *      the one that was built here, the whole chunk returns quietly.
+ *   8. Wraps the body in an always-true arithmetic test with a dead branch, and
+ *      stores every hidden name in one table at shuffled slots, so a name never
+ *      sits next to the code that uses it.
+ *   9. Squeezes the whole result onto one line.
+ *  10. Adds a 10 second freshness guard.
  *
- *   const encoded = Obfuscate(script);
+ * The script keeps behaving exactly like the original. This is code
+ * protection, not a security boundary: someone can still run the script and
+ * read the strings it builds.
  *
- * Everything is on by default:
- *   - strip comments
- *   - rename local variables, parameters and loop variables
- *   - rename table fields on tables the script owns
- *   - rename global functions the script defines
- *   - hide builtin globals (print, game, Instance, string, ...)
- *   - encode numbers
- *   - encode strings (per-string XOR keystream, letter-only payload)
- *   - the result only runs while it is younger than 10 seconds
+ * Deploy: paste into a Worker, or `npx wrangler deploy` this file as your
+ * entrypoint. Then:
+ *   POST /            JSON  { "script": "print('hi')", "renameIdentifiers": true,
+ *                             "encodeNumbers": true, "stripComments": true }
+ *   POST /            raw text body (the script itself)
+ *   GET  /            a page with a text box to try it
  *
- * Any of it can be changed with a second argument, for example:
- *   Obfuscate(script, { maxAgeSeconds: 60 })
- *   Obfuscate(script, { maxAgeSeconds: 0, hideGlobals: false })
- *
- * This is code protection, not a security boundary: a determined reader can
- * still run the script and recover what it builds.
+ * Response: { "success": true, "script": "<obfuscated>", ... }
  */
 
 const MAX_SCRIPT_BYTES = 512 * 1024;
@@ -185,10 +203,20 @@ function randInt(max) {
 const LOWER = 'abcdefghijklmnopqrstuvwxyz';
 const ALNUM = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
+// Names are deliberately long and made of lookalike characters (I, l, 1, O, 0)
+// and underscores, so two generated names are hard to tell apart while reading.
+const MANGLED_POOL = 'iIlmnoO01_';
+
+function mangleName(minLength = 6) {
+  let name = '_';
+  const length = minLength + randInt(12);
+  for (let i = 0; i < length; i++) name += MANGLED_POOL[randInt(MANGLED_POOL.length)];
+  return name;
+}
+
 function randomName(source) {
   for (let attempt = 0; attempt < 50; attempt++) {
-    let name = '_' + LOWER[randInt(26)];
-    for (let i = 0; i < 7; i++) name += ALNUM[randInt(36)];
+    const name = mangleName(8);
     // Never pick a name the script already uses, and avoid the keyword-ish shape.
     if (!source.includes(name)) return name;
   }
@@ -646,8 +674,7 @@ function renameLocals(tokens, declarations) {
     if (!isSafeName(tokens, name, declared)) continue;
     let fresh;
     do {
-      fresh = '_' + LOWER[randInt(26)];
-      for (let k = 0; k < 6 + randInt(3); k++) fresh += ALNUM[randInt(36)];
+      fresh = mangleName(6);
     } while (used.has(fresh));
     used.add(fresh);
     map.set(name, fresh);
@@ -742,8 +769,7 @@ function literalStrings(tokens) {
 function freshName(used) {
   let name;
   do {
-    name = '_' + LOWER[randInt(26)];
-    for (let k = 0; k < 6 + randInt(3); k++) name += ALNUM[randInt(36)];
+    name = mangleName(6);
   } while (used.has(name));
   used.add(name);
   return name;
@@ -1039,34 +1065,666 @@ function renameStructure(tokens, opts, declNames) {
 /* encoder                                                             */
 /* ------------------------------------------------------------------ */
 
-const HEXISH = 'abcdefghijklmnopqrstuvwxyz';
+// The characters an encrypted payload is written with. Symbols dominate, so a
+// payload looks like noise instead of a word; every character here is safe
+// inside a Lua "..." literal and is looked up with string.find(..., true).
+const PAYLOAD_SYMBOLS = '@#$%^&*()!~;:<>?/|[]{}=+-_.';
+const PAYLOAD_ALNUM = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 function makeAlphabet() {
-  const pool = [...HEXISH].sort(() => Math.random() - 0.5);
-  return pool.slice(0, 16).join('');
+  const symbols = [...PAYLOAD_SYMBOLS].sort(() => Math.random() - 0.5).slice(0, 11);
+  const alnum = [...PAYLOAD_ALNUM].sort(() => Math.random() - 0.5).slice(0, 5);
+  return [...symbols, ...alnum].sort(() => Math.random() - 0.5).join('');
 }
 
-/** Encodes one string literal into a decoder call with XOR'd, letter-only payload. */
-function encodeBytes(decoderName, bytes, alphabet, encodeKey, countIt = true) {
-  const key = 1 + randInt(1 << 20);
-  let body = '';
-  for (let i = 0; i < bytes.length; i++) {
-    // Decoder walks the hex text two chars at a time, so its counter for this
-    // byte is 2*i+1. Keep both sides on the same keystream index.
-    const cipher = (bytes[i] ^ key ^ ((2 * i + 1) * 29)) & 0xff;
-    body += alphabet[cipher >> 4] + alphabet[cipher & 15];
+/**
+ * Encodes one string into a decoder call. The payload is cut into two or three
+ * fragments and listed backwards, and the runtime joins them from the last one
+ * down, so a tool that simply concatenates the literals gets nonsense.
+ */
+function encodeBytes(decoderName, bytes, cipher) {
+  const payload = cipher.encrypt(bytes);
+  const want = 2 + randInt(2);
+  const size = Math.ceil(payload.length / want);
+  const cuts = [];
+  for (let i = 0; i < payload.length; i += size) cuts.push(payload.slice(i, i + size));
+  if (cuts.length < 2) return `${decoderName}("${payload}")`;
+  cuts.reverse();
+  return `${decoderName}({${cuts.map((c) => `"${c}"`).join(',')}})`;
+}
+
+function encodeInteger(text, hideText) {
+  if (!/^0[xX][0-9a-fA-F]+$/.test(text) && !/^[0-9]+$/.test(text)) {
+    // A decimal or exponent literal: carry it as an encrypted string and parse
+    // it at run time, so prices and multipliers stop being searchable.
+    if (/^(?:[0-9]+\.[0-9]*|\.[0-9]+|[0-9]+(?:\.[0-9]*)?[eE][+-]?[0-9]+)$/.test(text)) {
+      return `tonumber(${hideText(text)})`;
+    }
+    return null;
   }
-  return `${decoderName}("${body}",${encodeKey(key)})`;
+
+  let value;
+  if (/^0[xX]/.test(text)) value = parseInt(text.slice(2), 16);
+  else value = parseInt(text, 10);
+  if (!Number.isFinite(value) || value > Number.MAX_SAFE_INTEGER - 0xfffff) return null;
+  if (value === 0) return '0';
+
+  // The number itself must never appear in the output, or a search for a price
+  // finds it straight away. Some become a decrypted string parsed at run time,
+  // the rest a sum or difference of two unrelated numbers.
+  const roll = randInt(3);
+  if (roll === 0) return `tonumber(${hideText(String(value))})`;
+  if (roll === 1 && value > 2) {
+    const pad = 1 + randInt(Math.min(value - 1, 999999));
+    return `(${pad}+${value - pad})`;
+  }
+  const r = 1 + randInt(999999);
+  return `(${value + r}-${r})`;
 }
 
-function encodeInteger(text) {
-  let value;
-  if (/^0[xX][0-9a-fA-F]+$/.test(text)) value = parseInt(text.slice(2), 16);
-  else if (/^[0-9]+$/.test(text)) value = parseInt(text, 10);
-  else return null;
-  if (!Number.isFinite(value) || value > 1e12) return null;
-  const r = 1 + randInt(5000);
-  return `(${value + r}-${r})`;
+/* ------------------------------------------------------------------ */
+/* instance properties, methods and services                            */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Indices of tokens that belong to a Luau type annotation. Members are never
+ * rewritten there: `local p: Instance` or `local x: Types.Foo` is a type, not a
+ * property read, and `Types[dec("Foo")]` would not parse.
+ */
+function markTypeAnnotations(tokens) {
+  const marked = new Set();
+  const typeKeyword = new Set(['nil', 'true', 'false', 'typeof', 'function']);
+
+  for (let i = 0; i < tokens.length; i++) {
+    const tk = tokens[i];
+    if (!isOp(tk, ':', '::')) continue;
+
+    if (isOp(tk, ':')) {
+      const n = nextSig(tokens, i);
+      const nameTok = tokens[n];
+      if (!nameTok || nameTok.t !== 'name') continue;
+      if (isOp(tokens[nextSig(tokens, n)], '(')) continue; // obj:method(...)
+    }
+
+    let depth = 0;
+    for (let k = i + 1; k < tokens.length; k++) {
+      const t = tokens[k];
+      if (t.t === 'comment') continue;
+      if (t.t === 'ws') {
+        if (depth === 0 && t.text.includes('\n')) break;
+        continue;
+      }
+      if (t.t === 'name') {
+        if (depth === 0 && KEYWORDS.has(t.text) && !typeKeyword.has(t.text)) break;
+        marked.add(k);
+        continue;
+      }
+      if (t.t === 'number' || t.t === 'string' || t.t === 'longstring') {
+        marked.add(k);
+        continue;
+      }
+      if (isOp(t, '{', '(', '[')) {
+        depth++;
+        marked.add(k);
+        continue;
+      }
+      if (isOp(t, '}', ')', ']')) {
+        if (depth === 0) break;
+        depth--;
+        marked.add(k);
+        continue;
+      }
+      if (depth === 0 && isOp(t, '=', ',', ';', '..', '+', '*', '/')) break;
+      marked.add(k);
+    }
+  }
+  return marked;
+}
+
+/** The `(`/`[`/`{` that matches the closer at `i`. */
+function matchingOpen(tokens, i) {
+  const close = tokens[i].text;
+  const open = close === ')' ? '(' : close === ']' ? '[' : '{';
+  let depth = 0;
+  for (let k = i; k >= 0; k--) {
+    const tk = tokens[k];
+    if (tk.t !== 'op') continue;
+    if (tk.text === close) depth++;
+    else if (tk.text === open) {
+      depth--;
+      if (depth === 0) return k;
+    }
+  }
+  return -1;
+}
+
+/**
+ * First token of the expression that ends at `endIdx`. Walks back over calls,
+ * indexes and `.` chains, so `game:GetService("X")` or `(a or b)` can be used
+ * as a receiver.
+ */
+function exprStart(tokens, endIdx) {
+  let j = endIdx;
+  for (let hop = 0; hop < 128; hop++) {
+    const tk = tokens[j];
+    if (!tk) return -1;
+    if (tk.t === 'name' || tk.t === 'string' || tk.t === 'longstring' || tk.t === 'number') {
+      if (tk.t === 'name' && (tk.text === 'end' || tk.text === 'function')) return -1;
+      const dot = prevSig(tokens, j);
+      if (isOp(tokens[dot], '.', ':')) {
+        const prev = prevSig(tokens, dot);
+        const p = tokens[prev];
+        if (p && (p.t === 'name' || p.t === 'string' || p.t === 'longstring' || isOp(p, ')', ']', '}'))) {
+          j = prev;
+          continue;
+        }
+      }
+      return j;
+    }
+    if (isOp(tk, ')') || isOp(tk, ']') || isOp(tk, '}')) {
+      const open = matchingOpen(tokens, j);
+      if (open < 0) return -1;
+      if (isOp(tokens[open], '{')) return open;
+      const before = prevSig(tokens, open);
+      const b = tokens[before];
+      if (b && (b.t === 'name' || b.t === 'string' || b.t === 'longstring' || isOp(b, ')', ']', '}'))) {
+        j = before;
+        continue;
+      }
+      return open;
+    }
+    return -1;
+  }
+  return -1;
+}
+
+/** How the name at `idx` is emitted: through the env lookup, or spelled out. */
+function renderName(tokens, idx, opts, ctx) {
+  const tk = tokens[idx];
+  if (!tk || tk.t !== 'name') return '';
+  if (!opts.hideGlobals || !HIDABLE_GLOBALS.has(tk.text)) return tk.text;
+  if (ctx.declarations.declared.has(idx)) return tk.text;
+  if (ctx.declarations.localNames.has(tk.text)) return tk.text;
+
+  const pt = tokens[prevSig(tokens, idx)];
+  const nt = tokens[nextSig(tokens, idx)];
+  if (isOp(pt, '.', ':', '::') || isTok(pt, 'local', 'function', 'goto')) return tk.text;
+  if (isOp(nt, '=', '::')) return tk.text;
+  return `${ctx.envName}(${ctx.hideKey(tk.text)})`;
+}
+
+/**
+ * Member access becomes encoded bracket access, so no Roblox property, method
+ * or service name is spelled out:
+ *
+ *   part.Parent             -> part[dec("...")]
+ *   game:GetService("X")    -> C((game),dec("..."),"X")
+ *   hs:JSONEncode(t)        -> C((hs),dec("..."),t)
+ *   game:GetService("HttpService"):JSONEncode(t)
+ *                           -> C((C((game),dec("..."),"H...")),dec("..."),t)
+ *
+ * `C(obj, key, ...)` is a one-line helper that looks the method up and passes
+ * the receiver on as the first argument, so the receiver is written once and
+ * may itself be any expression, including the result of another call.
+ */
+function planMembers(tokens, opts, ctx) {
+  const plan = {
+    prefixes: new Map(),
+    replacements: new Map(),
+    skips: new Set(),
+    count: 0,
+    usesCall: false,
+  };
+  if (!opts.hideMembers) return plan;
+
+  const annotations = markTypeAnnotations(tokens);
+
+  // `function a.b.c()` / `function a:m()` names cannot be bracket syntax.
+  const declPath = new Set();
+  for (let i = 0; i < tokens.length; i++) {
+    if (!isTok(tokens[i], 'function')) continue;
+    const paren = paramsStart(tokens, i);
+    if (paren < 0) continue;
+    for (let k = nextSig(tokens, i); k < paren; k++) declPath.add(k);
+  }
+
+  for (let i = 0; i < tokens.length; i++) {
+    const tk = tokens[i];
+    if (!isOp(tk, '.', ':')) continue;
+    if (annotations.has(i) || declPath.has(i)) continue;
+
+    const nameIdx = nextSig(tokens, i);
+    const nameTok = tokens[nameIdx];
+    if (!nameTok || nameTok.t !== 'name' || KEYWORDS.has(nameTok.text)) continue;
+    if (declPath.has(nameIdx)) continue;
+
+    if (isOp(tk, '.')) {
+      plan.count++;
+      plan.replacements.set(i, `[${ctx.hideKey(nameTok.text)}]`);
+      for (let k = i + 1; k < nameIdx; k++) plan.skips.add(k);
+      plan.skips.add(nameIdx);
+      continue;
+    }
+
+    // `obj:Method(` is a call; `obj: Type` is an annotation.
+    const openIdx = nextSig(tokens, nameIdx);
+    if (!isOp(tokens[openIdx], '(')) continue;
+
+    const start = exprStart(tokens, prevSig(tokens, i));
+    if (start < 0) continue;
+
+    // `obj:m(a, b)` -> `C((obj),key,a, b)`: the receiver is handed to the helper
+    // as the first argument, so nested receivers simply stack their prefixes.
+    plan.prefixes.set(start, `${ctx.callName}((` + (plan.prefixes.get(start) || ''));
+    plan.usesCall = true;
+    plan.count++;
+    for (let skip = i + 1; skip <= nameIdx; skip++) plan.skips.add(skip);
+
+    const closeIdx = nextSig(tokens, openIdx);
+    if (isOp(tokens[closeIdx], ')')) {
+      // obj:m()  ->  C((obj),key)
+      plan.replacements.set(i, `),${ctx.hideKey(nameTok.text)})`);
+      for (let skip = openIdx; skip <= closeIdx; skip++) plan.skips.add(skip);
+    } else {
+      plan.replacements.set(i, `),${ctx.hideKey(nameTok.text)},`);
+      plan.replacements.set(openIdx, '');
+    }
+  }
+
+  return plan;
+}
+
+/* ------------------------------------------------------------------ */
+/* payload cipher: AES-128-CTR with an RSA-wrapped key                  */
+/* ------------------------------------------------------------------ */
+
+function gfMultiply(a, b) {
+  let p = 0;
+  for (let i = 0; i < 8; i++) {
+    if (b & 1) p ^= a;
+    const hi = a & 0x80;
+    a = (a << 1) & 0xff;
+    if (hi) a ^= 0x1b;
+    b >>= 1;
+  }
+  return p;
+}
+
+/** The AES S-box, derived once so it never has to be typed out by hand. */
+function buildSBox() {
+  const inverse = new Uint8Array(256);
+  for (let a = 1; a < 256; a++) {
+    for (let b = 1; b < 256; b++) {
+      if (gfMultiply(a, b) === 1) {
+        inverse[a] = b;
+        break;
+      }
+    }
+  }
+  const rotl = (x, n) => ((x << n) | (x >> (8 - n))) & 0xff;
+  const box = new Uint8Array(256);
+  for (let i = 0; i < 256; i++) {
+    const x = inverse[i];
+    box[i] = (x ^ rotl(x, 1) ^ rotl(x, 2) ^ rotl(x, 3) ^ rotl(x, 4) ^ 0x63) & 0xff;
+  }
+  return box;
+}
+
+const SBOX = buildSBox();
+const xtime = (a) => ((a << 1) ^ (a & 0x80 ? 0x1b : 0)) & 0xff;
+
+function expandAesKey(keyBytes) {
+  const rk = keyBytes.slice();
+  let rcon = 1;
+  for (let i = 16; i < 176; i += 4) {
+    let t;
+    if (i % 16 === 0) {
+      t = [SBOX[rk[i - 3]] ^ rcon, SBOX[rk[i - 2]], SBOX[rk[i - 1]], SBOX[rk[i - 4]]];
+      rcon = xtime(rcon);
+    } else {
+      t = [rk[i - 4], rk[i - 3], rk[i - 2], rk[i - 1]];
+    }
+    for (let j = 0; j < 4; j++) rk[i + j] = rk[i - 16 + j] ^ t[j];
+  }
+  return rk;
+}
+
+/** One AES-128 block, encryption direction (all CTR needs). */
+function aesEncryptBlock(rk, input) {
+  const st = new Array(16);
+  for (let i = 0; i < 16; i++) st[i] = input[i] ^ rk[i];
+
+  for (let round = 1; round <= 10; round++) {
+    const t = new Array(16);
+    for (let c = 0; c < 4; c++) {
+      for (let r = 0; r < 4; r++) t[r + 4 * c] = SBOX[st[r + 4 * ((c + r) & 3)]];
+    }
+    if (round < 10) {
+      for (let c = 0; c < 4; c++) {
+        const a0 = t[4 * c];
+        const a1 = t[4 * c + 1];
+        const a2 = t[4 * c + 2];
+        const a3 = t[4 * c + 3];
+        t[4 * c] = xtime(a0) ^ xtime(a1) ^ a1 ^ a2 ^ a3;
+        t[4 * c + 1] = a0 ^ xtime(a1) ^ xtime(a2) ^ a2 ^ a3;
+        t[4 * c + 2] = a0 ^ a1 ^ xtime(a2) ^ xtime(a3) ^ a3;
+        t[4 * c + 3] = xtime(a0) ^ a0 ^ a1 ^ a2 ^ xtime(a3);
+      }
+    }
+    for (let i = 0; i < 16; i++) st[i] = t[i] ^ rk[16 * round + i];
+  }
+  return st;
+}
+
+const PM_MOD = 2147483647;
+
+const SMALL_PRIMES = [
+  3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97,
+  101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151, 157, 163, 167, 173, 179, 181, 191, 193,
+  197, 199, 211, 223, 227, 229, 233, 239, 241, 251,
+];
+
+function modpowBig(base, exp, mod) {
+  let result = 1n;
+  base %= mod;
+  while (exp > 0n) {
+    if (exp & 1n) result = (result * base) % mod;
+    base = (base * base) % mod;
+    exp >>= 1n;
+  }
+  return result;
+}
+
+function isPrime(n) {
+  if (n < 2) return false;
+  for (const p of SMALL_PRIMES) {
+    if (n === p) return true;
+    if (n % p === 0) return false;
+  }
+  let d = n - 1;
+  let s = 0;
+  while (d % 2 === 0) {
+    d /= 2;
+    s++;
+  }
+  for (const a of [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37]) {
+    if (a % n === 0) continue;
+    let x = Number(modpowBig(BigInt(a), BigInt(d), BigInt(n)));
+    if (x === 1 || x === n - 1) continue;
+    let ok = false;
+    for (let r = 1; r < s; r++) {
+      x = (x * x) % n;
+      if (x === n - 1) {
+        ok = true;
+        break;
+      }
+    }
+    if (!ok) return false;
+  }
+  return true;
+}
+
+function randomPrime() {
+  for (;;) {
+    const buf = new Uint16Array(1);
+    crypto.getRandomValues(buf);
+    const n = (buf[0] | 1 | 0x8000) & 0xffff;
+    if (isPrime(n)) return n;
+  }
+}
+
+function modInverse(a, m) {
+  let oldR = a % m;
+  let r = m;
+  let oldS = 1n;
+  let s = 0n;
+  while (r !== 0n) {
+    const q = oldR / r;
+    [oldR, r] = [r, oldR - q * r];
+    [oldS, s] = [s, oldS - q * s];
+  }
+  return ((oldS % m) + m) % m;
+}
+
+/**
+ * Real RSA maths with a 31-32 bit modulus: the AES key seed is encrypted with
+ * the public exponent and the script carries only the private exponent, so the
+ * key never appears in the output as a plain number.
+ */
+function wrapAesKey() {
+  for (;;) {
+    const p = randomPrime();
+    const q = randomPrime();
+    const n = p * q;
+    const phi = (p - 1) * (q - 1);
+    if (p === q || n < 1 << 30 || n >= 2 ** 32) continue;
+    if (phi % 65537 === 0) continue;
+    const e = 65537n;
+    const d = modInverse(e, BigInt(phi));
+    const seed = 1 + randInt(Math.min(n - 1, PM_MOD - 1));
+    const c = Number(modpowBig(BigInt(seed), e, BigInt(n)));
+    return { n, d: Number(d), c, keyBytes: parkBytes(seed) };
+  }
+}
+
+/** Park-Miller expansion of the 31 bit seed into a 16 byte AES key. */
+function parkBytes(seed) {
+  let x = seed % PM_MOD;
+  if (x <= 0) x += PM_MOD - 1;
+  const out = [];
+  for (let i = 0; i < 16; i++) {
+    x = (x * 48271) % PM_MOD;
+    out.push(x % 256);
+  }
+  return out;
+}
+
+/** Bytes as two characters per byte, using only the random alphabet. */
+function packBytes(bytes, alphabet) {
+  let out = '';
+  for (const b of bytes) out += alphabet[b >> 4] + alphabet[b & 15];
+  return out;
+}
+
+/**
+ * AES-128 in CTR mode: each payload starts with a random 8 byte nonce and is
+ * XORed with the keystream of AES(nonce || counter).
+ */
+function makeCipher(alphabet) {
+  const wrapped = wrapAesKey();
+  const rk = expandAesKey(wrapped.keyBytes);
+
+  const encrypt = (bytes) => {
+    // Pad to a whole number of 16 byte blocks, so two strings of different
+    // lengths do not give their lengths away. The first plaintext byte says how
+    // much padding to drop again.
+    const padLen = (16 - ((bytes.length + 1) % 16)) % 16;
+    const data = [padLen, ...bytes];
+    for (let k = 0; k < padLen; k++) data.push(randInt(256));
+
+    const nonce = new Uint8Array(8);
+    crypto.getRandomValues(nonce);
+    const payload = [...nonce];
+    for (let j = 0; j < data.length; j += 16) {
+      const counter = j / 16 + 1;
+      const block = [
+        ...nonce,
+        0, 0, 0, 0,
+        (counter >>> 24) & 255,
+        (counter >>> 16) & 255,
+        (counter >>> 8) & 255,
+        counter & 255,
+      ];
+      const ks = aesEncryptBlock(rk, block);
+      for (let k = 0; k < 16 && j + k < data.length; k++) payload.push(data[j + k] ^ ks[k]);
+    }
+    return packBytes(payload, alphabet);
+  };
+
+  return { n: wrapped.n, d: wrapped.d, c: wrapped.c, encrypt };
+}
+
+/**
+ * Every hidden word is decrypted once, into one table, but each word goes into a
+ * random slot and the assignments are written in random order. The body only
+ * ever mentions a slot number, so a name and the place it is used are never
+ * next to each other in the file.
+ */
+function buildNameTable(decoder, cipher, hiddenKeys, seen) {
+  const [T] = preludeNames(seen + 'nameTable', 1);
+  const words = [...hiddenKeys.keys()];
+  const span = words.length * 3 + 9;
+  const used = new Set();
+  const pickSlot = () => {
+    let slot = 1 + randInt(span);
+    for (let tries = 0; used.has(slot) && tries < 64; tries++) slot = 1 + randInt(span);
+    while (used.has(slot)) slot++;
+    used.add(slot);
+    return slot;
+  };
+
+  const slots = new Map();
+  const lines = [];
+  for (const word of words) {
+    const slot = pickSlot();
+    slots.set(word, slot);
+    lines.push(`${T}[${slot}]=${encodeBytes(decoder, [...encoder.encode(word)], cipher)} `);
+  }
+
+  // A few junk slots, so the table does not read like a tidy list of names.
+  const junk = 2 + randInt(3);
+  for (let i = 0; i < junk; i++) {
+    const slot = pickSlot();
+    const bytes = [];
+    const len = 2 + randInt(9);
+    for (let k = 0; k < len; k++) bytes.push(33 + randInt(90));
+    lines.push(`${T}[${slot}]=${encodeBytes(decoder, bytes, cipher)} `);
+  }
+
+  lines.sort(() => Math.random() - 0.5);
+
+  return {
+    text: `local ${T}={} ` + lines.join(''),
+    substitute: (text) =>
+      text.replace(/\u0001(\d+)\u0001/g, (_, n) => `${T}[${slots.get(words[Number(n)])}]`),
+  };
+}
+
+/**
+ * The body goes inside a test that is always true but is written as arithmetic
+ * on unrelated numbers, with a dead branch that looks like a real check.
+ */
+function opaqueWrap(body, seen) {
+  const [A, B, D] = preludeNames(seen + body, 3);
+  const k = 2 + randInt(99991);
+  const m = 2 + randInt(9999);
+  return (
+    `local ${A}=bit32.bxor(${k},${k}) local ${B}=math.floor(${m}/${m})-1 ` +
+    `if ${A}+${B}==0 and ${A}<=${B} then ` +
+    body +
+    ` else local ${D}=${A}+${B} if ${D}>0 then return end end `
+  );
+}
+
+/**
+ * A canary payload plus a shape check on the decoder: a random token must come
+ * back with the right length and the right weighted byte sum. If someone swapped
+ * the decoder out, the check fails and the chunk returns quietly instead of
+ * running under their hook.
+ */
+function tamperGuard(decoder, cipher, seen) {
+  const len = 6 + randInt(6);
+  const bytes = [];
+  for (let i = 0; i < len; i++) bytes.push(33 + randInt(90));
+  let sum = 0;
+  for (let i = 0; i < len; i++) sum = (sum + ((bytes[i] * (i + 1)) % 251)) % 251;
+
+  const call = encodeBytes(decoder, bytes, cipher);
+  const [T, V, N] = preludeNames(seen + call, 3);
+
+  // Both numbers are carried as a sum of two unrelated parts.
+  const lenA = 1 + randInt(len - 1);
+  const lenExpr = `(${lenA}+${len - lenA})`;
+  let sumExpr = String(sum);
+  if (sum > 2) {
+    const sumA = 1 + randInt(sum - 1);
+    sumExpr = `(${sumA}+${sum - sumA})`;
+  }
+
+  return (
+    `local ${V}=${call} ` +
+    `local ${T}=(function(v)local ${N}=0 for i=1,#v do ${N}=(${N}+(string.byte(v,i)*i)%251)%251 end return ${N} end)(${V}) ` +
+    `if #${V}~=${lenExpr} or ${T}~=${sumExpr} then return end `
+  );
+}
+
+/**
+ * Real decryptions that nothing ever reads: extra payloads of random lengths,
+ * so the number and shape of the payloads in the output tells a reader nothing.
+ */
+function decoyPayloads(decoder, cipher) {
+  const count = 2 + randInt(3);
+  const holes = [];
+  for (let i = 0; i < count; i++) {
+    const bytes = [];
+    const len = 2 + randInt(10);
+    for (let k = 0; k < len; k++) bytes.push(randInt(256));
+    holes.push(encodeBytes(decoder, bytes, cipher));
+  }
+  const names = holes.map((_, i) => '_' + MANGLED_POOL[randInt(MANGLED_POOL.length)] + i);
+  return (
+    `;(function()local ${names.join(',')}=${holes.join(',')} ` +
+    `if #${names[0]}<0 then return ${names[0]} end end)() `
+  );
+}
+
+/** A few distinct, name-mangled identifiers that never occur in the script. */
+function preludeNames(source, count) {
+  const names = [];
+  for (let i = 0; i < count; i++) {
+    let name = randomName(source);
+    while (names.includes(name)) name = randomName(source + names.join(''));
+    names.push(name);
+  }
+  return names;
+}
+
+/**
+ * The Lua side of the cipher: alphabet, S-box, AES encryption, CTR keystream,
+ * the RSA unwrap and the cached decoder call the payloads are wrapped in.
+ */
+function aesPrelude(source, decoder, alphabet, sboxPack, cipher) {
+  const [A, S, U, P, X, M, KB, R, E, C] = preludeNames(source + decoder, 10);
+
+  return (
+    `local ${A}="${alphabet}" ` +
+    `local ${S}={} ` +
+    `local ${U}=function(v)return string.find(${A},v,1,true)-1 end ` +
+    `local ${P}="${sboxPack}" ` +
+    `for i=1,#${P},2 do ${S}[#${S}+1]=${U}(${P}:sub(i,i))*16+${U}(${P}:sub(i+1,i+1)) end ` +
+    `local ${X}=function(v)local d=bit32.band(bit32.lshift(v,1),255)if bit32.band(v,128)~=0 then d=bit32.bxor(d,27)end return d end ` +
+    `local ${M}=function(a,b,m)local r=0 while b>0 do if b%2==1 then r=(r+a)%m end a=(a*2)%m b=math.floor(b/2)end return r end ` +
+    `local ${KB}=(function(c,d,n)local r=1 c=c%n while d>0 do if d%2==1 then r=${M}(r,c,n)end c=${M}(c,c,n)d=math.floor(d/2)end ` +
+    `local x=r%2147483647 if x<=0 then x=x+2147483646 end local kb={}for i=1,16 do x=(x*48271)%2147483647 kb[i]=x%256 end return kb end)(${cipher.c},${cipher.d},${cipher.n}) ` +
+    `local ${R}=(function(kb)local k={}for i=1,16 do k[i]=kb[i]end local rc=1 local i=17 while i<=176 do local t ` +
+    `if (i-1)%16==0 then t={bit32.bxor(${S}[k[i-3]+1],rc),${S}[k[i-2]+1],${S}[k[i-1]+1],${S}[k[i-4]+1]}rc=${X}(rc)else t={k[i-4],k[i-3],k[i-2],k[i-1]}end ` +
+    `for j=0,3 do k[i+j]=bit32.bxor(k[i-16+j],t[j+1])end i=i+4 end return k end)(${KB}) ` +
+    `local ${E}=function(m)local st={}for i=1,16 do st[i]=bit32.bxor(m[i],${R}[i])end for r=1,10 do local t={} ` +
+    `for c=0,3 do for q=0,3 do t[q+4*c+1]=${S}[st[q+4*((c+q)%4)+1]+1]end end ` +
+    `if r<10 then for c=0,3 do local a0,a1,a2,a3=t[4*c+1],t[4*c+2],t[4*c+3],t[4*c+4] ` +
+    `t[4*c+1]=bit32.bxor(${X}(a0),${X}(a1),a1,a2,a3)t[4*c+2]=bit32.bxor(a0,${X}(a1),${X}(a2),a2,a3) ` +
+    `t[4*c+3]=bit32.bxor(a0,a1,${X}(a2),${X}(a3),a3)t[4*c+4]=bit32.bxor(${X}(a0),a0,a1,a2,${X}(a3))end end ` +
+    `for i=1,16 do st[i]=bit32.bxor(t[i],${R}[16*r+i])end end return st end ` +
+    `local ${C}={} ` +
+    `local ${decoder}=function(s)if type(s)=="table" then local r={}for u=#s,1,-1 do r[#r+1]=s[u]end s=table.concat(r)end ` +
+    `local v=${C}[s]if v then return v end ` +
+    `local n=math.floor(#s/2)local b={}for i=1,n do b[i]=${U}(s:sub(2*i-1,2*i-1))*16+${U}(s:sub(2*i,2*i))end ` +
+    `local o={}local c=0 local i=9 while i<=n do c=c+1 ` +
+    `local m={b[1],b[2],b[3],b[4],b[5],b[6],b[7],b[8],0,0,0,0,0,0,0,0} ` +
+    `m[13]=math.floor(c/16777216)%256 m[14]=math.floor(c/65536)%256 m[15]=math.floor(c/256)%256 m[16]=c%256 ` +
+    `local k=${E}(m)local j=1 while j<=16 and i<=n do o[#o+1]=string.char(bit32.bxor(b[i],k[j]))i=i+1 j=j+1 end end ` +
+    `v=table.concat(o)local p=string.byte(v,1)or 0 v=v:sub(2,#v-p)${C}[s]=v return v end `
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -1080,6 +1738,8 @@ const DEFAULTS = {
   renameGlobals: true,
   encodeNumbers: true,
   hideGlobals: true,
+  hideMembers: true,
+  singleLine: true,
   maxAgeSeconds: 10,
 };
 
@@ -1099,30 +1759,35 @@ function expiryPrelude(seconds) {
   const now = n();
 
   return (
-    `local ${F}=(function()\n` +
-    `local ${ok},${now}=pcall(function() return os.time() end)\n` +
-    `if not ${ok} or type(${now})~="number" then return true end\n` +
-    `return ${now}-(${stamp + jitter}-${jitter})<=${seconds}\n` +
-    `end)()\n` +
-    `if not ${F} then return end\n`
+    `local ${F}=(function() ` +
+    `local ${ok},${now}=pcall(function() return os.time() end) ` +
+    `if not ${ok} or type(${now})~="number" then return true end ` +
+    `return ${now}-(${stamp + jitter}-${jitter})<=${seconds} ` +
+    `end)() ` +
+    `if not ${F} then return end `
   );
 }
 
 /** Resolves `print`, `game`, `Instance` ... out of the script's own environment. */
 function envHelper(name) {
   return (
-    `local ${name}=(function()\n` +
-    `local E=nil\n` +
-    `local ok,env=pcall(function() return getfenv(0) end)\n` +
-    `if ok and type(env)=="table" then E=env end\n` +
-    `if type(E)~="table" then E=_G end\n` +
-    `return function(k)\n` +
-    `local v=E[k]\n` +
-    `if v==nil and E~=_G then v=_G[k] end\n` +
-    `return v\n` +
-    `end\n` +
-    `end)()\n`
+    `local ${name}=(function() ` +
+    `local E=nil ` +
+    `local ok,env=pcall(function() return getfenv(0) end) ` +
+    `if ok and type(env)=="table" then E=env end ` +
+    `if type(E)~="table" then E=_G end ` +
+    `return function(k) ` +
+    `local v=E[k] ` +
+    `if v==nil and E~=_G then v=_G[k] end ` +
+    `return v ` +
+    `end ` +
+    `end)() `
   );
+}
+
+/** `C(obj, key, ...)` calls `obj[key](obj, ...)`: a method call with a hidden name. */
+function callHelper(name) {
+  return `local ${name}=function(o,k,...)return o[k](o,...)end `;
 }
 
 /**
@@ -1150,36 +1815,62 @@ function obfuscate(source, options = {}) {
 
   const renamedLocals = opts.renameIdentifiers ? renameLocals(tokens, declarations) : 0;
 
-  const decoder = randomName(source + tokens.map((t) => t.text).join(''));
+  const sourceAll = source + tokens.map((t) => t.text).join('');
+  const decoder = randomName(sourceAll);
   const alphabet = makeAlphabet();
+  const cipher = makeCipher(alphabet);
+  const sboxPack = packBytes(SBOX, alphabet);
 
   let encodedStrings = 0;
   let encodedNumbers = 0;
 
-  const encodeKey = (key) => {
-    if (!opts.encodeNumbers) return String(key);
-    return encodeInteger(String(key)) || String(key);
-  };
-
   const parts = [];
   let hiddenGlobals = 0;
-  const envName = randomName(source + tokens.map((t) => t.text).join(''));
+  let hiddenMembers = 0;
+  const envName = randomName(sourceAll);
+  const callName = randomName(sourceAll + envName);
+
+  // Each hidden word is only ever referred to by a slot number; the slots are
+  // filled at run time by buildNameTable().
+  const hiddenKeys = new Map();
+  const hideKey = (text) => {
+    let slot = hiddenKeys.get(text);
+    if (slot === undefined) {
+      slot = hiddenKeys.size;
+      hiddenKeys.set(text, slot);
+    }
+    return `\u0001${slot}\u0001`;
+  };
+
+  const members = planMembers(tokens, opts, { hideKey, envName, callName, declarations });
 
   for (let i = 0; i < tokens.length; i++) {
     const tk = tokens[i];
+    if (members.prefixes.has(i)) parts.push(members.prefixes.get(i));
+    if (members.skips.has(i)) continue;
+    if (members.replacements.has(i)) {
+      parts.push(members.replacements.get(i));
+      continue;
+    }
     if (tk.t === 'ws') {
-      parts.push(tk.text);
+      // One-line output: every run of whitespace becomes a single space, which
+      // Lua treats the same as a newline.
+      parts.push(opts.singleLine ? ' ' : tk.text);
       continue;
     }
     if (tk.t === 'comment') {
-      if (!opts.stripComments) parts.push(tk.text);
+      if (!opts.stripComments) {
+        parts.push(tk.text);
+        // A `--` comment would otherwise swallow the rest of the line.
+        if (opts.singleLine && !/^--\[=*\[/.test(tk.text)) parts.push('\n');
+      }
       continue;
     }
 
     if (tk.t === 'string') {
       const parsed = parseShortString(tk.text, 0);
       if (parsed && parsed.end === tk.text.length) {
-        parts.push(encodeBytes(decoder, parsed.bytes, alphabet, encodeKey));
+        parts.push(encodeBytes(decoder, parsed.bytes, cipher));
         encodedStrings++;
       } else {
         parts.push(tk.text);
@@ -1194,7 +1885,7 @@ function obfuscate(source, options = {}) {
         // Lua drops a newline that immediately follows the opening bracket.
         if (content.startsWith('\r\n')) content = content.slice(2);
         else if (content.startsWith('\n')) content = content.slice(1);
-        parts.push(encodeBytes(decoder, [...encoder.encode(content)], alphabet, encodeKey));
+        parts.push(encodeBytes(decoder, [...encoder.encode(content)], cipher));
         encodedStrings++;
       } else {
         parts.push(tk.text);
@@ -1203,7 +1894,7 @@ function obfuscate(source, options = {}) {
     }
 
     if (tk.t === 'number' && opts.encodeNumbers) {
-      const encoded = encodeInteger(tk.text);
+      const encoded = encodeInteger(tk.text, hideKey);
       if (encoded) {
         parts.push(encoded);
         encodedNumbers++;
@@ -1227,8 +1918,7 @@ function obfuscate(source, options = {}) {
       const isDecl = isTok(pt, 'local', 'function', 'goto');
       const isTarget = isOp(nt, '=', '::');
       if (!isMember && !isDecl && !isTarget) {
-        const key = encodeBytes(decoder, [...encoder.encode(tk.text)], alphabet, encodeKey, false);
-        parts.push(`${envName}(${key})`);
+        parts.push(`${envName}(${hideKey(tk.text)})`);
         hiddenGlobals++;
         continue;
       }
@@ -1237,18 +1927,30 @@ function obfuscate(source, options = {}) {
     parts.push(tk.text);
   }
 
+  hiddenMembers = members.count;
+
   let script = parts.join('');
 
-  const needsRuntime = encodedStrings > 0 || hiddenGlobals > 0;
+  const needsRuntime =
+    encodedStrings > 0 || hiddenGlobals > 0 || hiddenMembers > 0 || hiddenKeys.size > 0;
   if (needsRuntime) {
-    const codes = [...alphabet].map((c) => c.charCodeAt(0)).join(',');
-    const prelude =
-      `local ${decoder}=function(s,k)local A=string.char(${codes})local o={}local f=string.find ` +
-      `local ch=string.char for i=1,#s,2 do ` +
-      `o[#o+1]=ch(bit32.bxor((f(A,s:sub(i,i),1,true)-1)*16+(f(A,s:sub(i+1,i+1),1,true)-1),k,i*29)%256)` +
-      `end return table.concat(o)end\n`;
-    script = prelude + (hiddenGlobals > 0 ? envHelper(envName) : '') + deadCode() + script;
+    let runtime = aesPrelude(sourceAll, decoder, alphabet, sboxPack, cipher);
+    runtime += decoyPayloads(decoder, cipher);
+    if (hiddenGlobals > 0) runtime += envHelper(envName);
+    if (members.usesCall) runtime += callHelper(callName);
+    if (hiddenKeys.size > 0) {
+      const table = buildNameTable(decoder, cipher, hiddenKeys, runtime + sourceAll);
+      runtime += table.text;
+      script = table.substitute(script);
+    }
+    runtime += deadCode();
+    runtime += tamperGuard(decoder, cipher, runtime + envName + callName);
+    script = runtime + opaqueWrap(script, runtime);
   }
+
+  // One more block around everything: the script's own locals stay inside it and
+  // the output no longer has the original chunk shape.
+  if (!source.startsWith('#')) script = 'do ' + script + ' end';
 
   const maxAgeSeconds =
     typeof opts.maxAgeSeconds === 'number' && opts.maxAgeSeconds > 0 ? opts.maxAgeSeconds : 0;
@@ -1262,6 +1964,7 @@ function obfuscate(source, options = {}) {
     renamedFields,
     renamedGlobals,
     hiddenGlobals,
+    hiddenMembers,
     maxAgeSeconds,
     decoder,
   };
@@ -1275,57 +1978,136 @@ function deadCode() {
   for (let i = 0; i < count; i++) {
     const a = 1 + randInt(999);
     const b = 1 + randInt(999);
-    out += `do local ${name()},${name()}=${a},${b} if ${a}>${b} and ${b}>${a} then end end\n`;
+    out += `do local ${name()},${name()}=${a},${b} if ${a}>${b} and ${b}>${a} then end end `;
   }
   return out;
 }
 
+export { obfuscate };
+
 /* ------------------------------------------------------------------ */
-/* the function you call                                              */
+/* worker                                                              */
 /* ------------------------------------------------------------------ */
-
-/**
- * Obfuscate a Roblox / Luau script.
- *
- * @param {string} script the original Luau source
- * @param {object} [options] optional overrides for any default above
- * @returns {string} the obfuscated script, ready to paste into Roblox
- */
-export function Obfuscate(script, options = {}) {
-  return obfuscate(script, { ...DEFAULTS, ...options }).script;
-}
-/**
- * Same as Obfuscate(), plus the counters (strings encoded, names renamed, ...).
- *
- * @param {string} script
- * @param {object} [options]
- */
-export function ObfuscateDetailed(script, options = {}) {
-  return obfuscate(script, { ...DEFAULTS, ...options });
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data, null, 2), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json; charset=utf-8' },
+  });
+}
+
+const PAGE = `<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roblox script obfuscator</title>
+<style>
+  :root { color-scheme: dark; }
+  body { margin:0; padding:24px; font:15px/1.5 ui-sans-serif,system-ui,sans-serif; background:#111318; color:#e8eaf0; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  p  { margin:0 0 14px; color:#9aa3b2; font-size:13px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:820px) { .row { grid-template-columns:1fr; } }
+  textarea { width:100%; height:340px; box-sizing:border-box; padding:10px; border-radius:8px;
+             border:1px solid #2a2f3a; background:#0b0d12; color:#dfe3ec;
+             font:12px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace; resize:vertical; }
+  button { margin:12px 0; padding:9px 16px; border-radius:8px; border:0; background:#4f7cff; color:#fff;
+           font-weight:600; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:default; }
+  .opts { display:flex; flex-wrap:wrap; gap:16px; color:#9aa3b2; font-size:13px; margin-top:4px; }
+  .opts label { display:flex; align-items:center; gap:6px; cursor:pointer; }
+  .err { color:#ff6b6b; font-size:13px; min-height:18px; }
+  .stats { color:#7f8a9c; font-size:12px; min-height:16px; }
+</style>
+<h1>Roblox / Luau script obfuscator</h1>
+<p>Paste a script. Comments go away, locals, fields, globals, builtin names and every Roblox property, method and service name get hidden, strings get AES-128 encrypted under an RSA-wrapped key into symbol-noise payloads (padded so their length does not show, with decoy payloads mixed in), every number (decimals included) gets encoded, a canary check makes the script quietly stop if the decoder is swapped, the whole thing comes out as one line, and the result only runs while it is fresh.</p>
+<div class="row">
+  <textarea id="input" spellcheck="false" placeholder="-- your script here"></textarea>
+  <textarea id="output" spellcheck="false" readonly placeholder="obfuscated output"></textarea>
+</div>
+<div class="opts">
+  <label><input type="checkbox" id="rename" checked> rename variables</label>
+  <label><input type="checkbox" id="fields" checked> rename table fields</label>
+  <label><input type="checkbox" id="globals" checked> rename global functions</label>
+  <label><input type="checkbox" id="hideglobals" checked> hide globals (print, game…)</label>
+  <label><input type="checkbox" id="members" checked> hide properties &amp; services (Parent, GetService, JSONEncode…)</label>
+  <label><input type="checkbox" id="oneline" checked> one-line output</label>
+  <label><input type="checkbox" id="numbers" checked> encode numbers</label>
+  <label><input type="checkbox" id="comments" checked> strip comments</label>
+  <label>runs only if younger than <input type="number" id="age" value="10" min="0" max="3600" step="1"> seconds</label>
+</div>
+<button id="go">Obfuscate</button>
+<div class="stats" id="stats"></div>
+<div class="err" id="err"></div>
+<script>
+  const go = document.getElementById('go');
+  const err = document.getElementById('err');
+  const stats = document.getElementById('stats');
+  go.addEventListener('click', async () => {
+    err.textContent = '';
+    stats.textContent = '';
+    go.disabled = true;
+    try {
+      const res = await fetch('/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          script: document.getElementById('input').value,
+          renameIdentifiers: document.getElementById('rename').checked,
+          renameFields: document.getElementById('fields').checked,
+          renameGlobals: document.getElementById('globals').checked,
+          hideGlobals: document.getElementById('hideglobals').checked,
+          hideMembers: document.getElementById('members').checked,
+          singleLine: document.getElementById('oneline').checked,
+          encodeNumbers: document.getElementById('numbers').checked,
+          stripComments: document.getElementById('comments').checked,
+          maxAgeSeconds: Number(document.getElementById('age').value),
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'something went wrong');
+      document.getElementById('output').value = data.script;
+      stats.textContent =
+        data.encodedStrings + ' strings encoded · ' +
+        data.renamedLocals + ' locals renamed · ' +
+        data.renamedFields + ' fields renamed · ' +
+        data.renamedGlobals + ' globals renamed · ' +
+        data.hiddenGlobals + ' builtin names hidden · ' +
+        data.hiddenMembers + ' properties/methods hidden · ' +
+        data.encodedNumbers + ' numbers encoded' +
+        (data.maxAgeSeconds > 0 ? ' · valid for ' + data.maxAgeSeconds + 's' : ' · no age limit');
+    } catch (e) {
+      err.textContent = e.message;
+    } finally {
+      go.disabled = false;
+    }
+  });
+</script>
+</html>`;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 export default {
@@ -1344,6 +2126,11 @@ export default {
 
 
 
+    const result = obfuscate("print('Hi')");
+    return new Response(result.script, { status: 200, headers: { "Content-Type": "text/plain", ...CORS }});
+    
+
+    
     // Handle Access Scripts
     if (pathname && auth && K) {
       const key = pathname;
