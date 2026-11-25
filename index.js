@@ -2122,12 +2122,7 @@ export default {
     // CORS HEADERS (DO NOT REMOVE IT)
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS });
-    }
-
-
-
-    const result = obfuscate("print('Hi')");
-    return new Response(result.script, { status: 200, headers: { "Content-Type": "text/plain", ...CORS }});
+    }  
     
 
     
@@ -2158,7 +2153,7 @@ export default {
 
 
       // Obfuscate Script
-      const result = obfuscate(script, { ...DEFAULTS });
+      const result = obfuscate(script);
       script = result.script;
       //
 
@@ -2195,8 +2190,6 @@ export default {
           ...CORS }
       });
     }
-
-
     
 
     return new Response("404: Not Found", { status: 404, headers: { "Content-Type": "text/plain", ...CORS }});
