@@ -2130,7 +2130,9 @@ export default {
 
     if (pathname && pathname === "testing") {
       const json = JSON.stringify({ Name: "testing", Expiration: Date.now() + 5000 });
-      return new Response(`loadstring(game:HttpGet("${domain}/source?auth=${EncodeText(json, ServiceKey)}"))()`, { status: 200, headers: { "Content-Type": "text/plain", ...CORS }});
+      const script = `loadstring(game:HttpGet("${domain}/source?auth=${EncodeText(json, ServiceKey)}"))()`;
+      const result = obfuscate(script);
+      return new Response(result.script, { status: 200, headers: { "Content-Type": "text/plain", ...CORS }});
     }
     
     if (pathname && pathname === "source" && auth) {
