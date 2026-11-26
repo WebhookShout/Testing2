@@ -2126,19 +2126,18 @@ export default {
     
 
 
+
     
 
     if (pathname && pathname === "testing") {
-      const json = JSON.stringify({ Name: "testing", Expiration: Date.now() + 5000 });
-      const script = `loadstring(game:HttpGet("${domain}/source?auth=${EncodeText(json, ServiceKey)}"))()`;
+      const script = `loadstring(game:HttpGet("${domain}/source?auth=${EncodeText(Date.now() + 5000, ServiceKey)}"))()`;
       const result = obfuscate(script);
       return new Response(result.script, { status: 200, headers: { "Content-Type": "text/plain", ...CORS }});
     }
     
     if (pathname && pathname === "source" && auth) {
-      const data = JSON.parse(DecodeText(auth, ServiceKey));
-      // Detect if data decoded error
-      if (!data || typeof data !== 'object' || !('Expiration' in data) || data.Expiration < Date.now()) {
+      const exp = DecodeText(auth, ServiceKey);
+      if (exp < Date.now()) {
          return new Response(`404: Not Found`, { status: 404, headers: { "Content-Type": "text/plain", ...CORS }});
       }
       return new Response(`print("Hello World")`, { status: 200, headers: { "Content-Type": "text/plain", ...CORS }});
