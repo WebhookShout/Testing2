@@ -2125,6 +2125,27 @@ export default {
     }  
     
 
+
+    
+
+    if (pathname && pathname === "testing") {
+      const json = JSON.stringify({ Name: "testing", Expiration: Date.now() + 5000 });
+      return new Response(`loadstring(game:HttpGet("${domain}/source?auth=${EncodeText(json, ServiceKey)}"))()`, { status: 200, headers: { "Content-Type": "text/plain", ...CORS }});
+    }
+    
+    if (pathname && pathname === "source" && auth) {
+      const data = JSON.parse(DecodeText(auth, ServiceKey));
+      // Detect if data decoded error
+      if (!data || typeof data !== 'object' || !('Expiration' in data) || data.Expiration < Date.now()) {
+         return new Response(`404: Not Found`, { status: 404, headers: { "Content-Type": "text/plain", ...CORS }});
+      }
+      return new Response(`print("Hello World")`, { status: 200, headers: { "Content-Type": "text/plain", ...CORS }});
+    }
+
+
+
+
+
     
     // Handle Access Scripts
     if (pathname && auth && K) {
@@ -2192,7 +2213,7 @@ export default {
           ...CORS }
       });
     }
-    
+      
 
     return new Response("404: Not Found", { status: 404, headers: { "Content-Type": "text/plain", ...CORS }});
   }
