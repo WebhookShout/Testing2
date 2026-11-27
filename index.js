@@ -145,6 +145,7 @@ function GetNumberWithMath(num) {
 
 
 
+
 /* Luau obfuscator core - drop this into any Worker or module. No imports, no page, no fetch handler.
  * Usage: obfuscate(source, options) -> { script, ... }   (options are optional) */
 
@@ -2928,6 +2929,11 @@ class ProtoBuilder {
     this.code.push({ op, a, b, c });
     return this.code.length;
   }
+  globalKey(name, isWrite) {
+    if (isWrite) this.root.gWrite.add(name);
+    else this.root.gRead.add(name);
+    return this.constStr([...encoder.encode(name)]);
+  }
   here() {
     return this.code.length + 1;
   }
@@ -3102,7 +3108,7 @@ class ProtoBuilder {
           const r = this.resolve(node.path[0]);
           if (r.kind === 'local') this.emit('LSET', r.slot, t);
           else if (r.kind === 'up') this.emit('USET', r.index, t);
-          else this.emit('SETG', this.constStr([...encoder.encode(node.path[0])]), t);
+          else this.emit('SETG', this.globalKey(node.path[0], true), t);
           return;
         }
         let objTmp = this.allocTmp();
@@ -3166,7 +3172,7 @@ class ProtoBuilder {
       const r = this.resolve(t.name);
       if (r.kind === 'local') return { kind: 'local', slot: r.slot };
       if (r.kind === 'up') return { kind: 'up', index: r.index };
-      return { kind: 'global', kidx: this.constStr([...encoder.encode(t.name)]) };
+      return { kind: 'global', kidx: this.globalKey(t.name, true) };
     }
     if (t.type === 'Index') {
       const obj = this.allocTmp();
@@ -3497,7 +3503,7 @@ class ProtoBuilder {
         const r = this.resolve(node.name);
         if (r.kind === 'local') this.emit('LGET', dest, r.slot);
         else if (r.kind === 'up') this.emit('UGET', dest, r.index);
-        else this.emit('GETG', dest, this.constStr([...encoder.encode(node.name)]));
+        else this.emit('GETG', dest, this.globalKey(node.name, false));
         return;
       }
       case 'Paren':
@@ -3682,11 +3688,11 @@ function compileToProtos(source) {
   const parser = new LuaParser(tokens, (fn) => fn);
   const body = parser.block();
   if (parser.tok().k !== 'eof') vfail('trailing tokens near ' + parser.tok().v);
-  const root = { protos: [] };
+  const root = { protos: [], gRead: new Set(), gWrite: new Set() };
   const chunk = new ProtoBuilder(root, null, [], true);
   for (const st of body) chunk.stmt(st);
   const entry = chunk.finish();
-  return { protos: root.protos, entry };
+  return { protos: root.protos, entry, gRead: root.gRead, gWrite: root.gWrite };
 }
 
 const VM_ALPHABET_POOL = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!~';
@@ -3986,7 +3992,7 @@ function vmProgram(protos, entry, program, o) {
     'ALP', 'MP', 'UNP', 'PK', 'FLR', 'U1', 'ENV', 'EG', 'ES', 'P', 'CS', 'G', 'RUN',
     'R', 'UU', 'K', 'FL', 'CA', 'C', 'pc', 'key', 'cur', 'j', 'op', 'a', 'b', 'c',
     'V', 'KC', 'NS', 'NP', 'pv', 'CH', 't1', 't2', 't3', 'bk', 'O', 'q', 'HM',
-    'DX', 'SD', 'SD2', 'B2V', 'CHR', 'DEC', 'RB', 'RAW', 'S1', 'S2', 'S3',
+    'DX', 'SD', 'SD2', 'B2V', 'CHR', 'DEC', 'RB', 'RAW', 'S1', 'S2', 'S3', 'PG',
   ]) {
     D[key] = n();
   }
@@ -4425,8 +4431,18 @@ function vmProgram(protos, entry, program, o) {
   out += `if ok and type(g)=="table" then return g end `;
   out += `local ok2,e=pcall(function() return getfenv(0) end) `;
   out += `if ok2 and type(e)=="table" then return e end return _G end)() `;
+  // Globals the script never defines (functions a loaded chunk hands back,
+  // executor callbacks, ...) are read through an accessor that names them the
+  // way plain source would, so they resolve in this chunk's own environment
+  // instead of in a snapshot taken at startup.
+  out += `local ${D.PG}={} `;
+  for (const nm of o.plainGlobals || []) {
+    out += `${D.PG}["${nm}"]=function() return ${nm} end `;
+  }
   out += `local ${D.EG}=function(k) local v=${D.ENV}[k] `;
-  out += `if v==nil and ${D.ENV}~=_G then v=_G[k] end return v end `;
+  out += `if v==nil and ${D.ENV}~=_G then v=_G[k] end `;
+  out += `if v==nil then local f=${D.PG}[k] if f then v=f() end end `;
+  out += `return v end `;
   out += `local ${D.ES}=function(k,v) ${D.ENV}[k]=v if ${D.ENV}~=_G then _G[k]=v end end `;
   out += `local ${D.CH}={} `;
   for (let i = 0; i < chunkTables.length; i++) {
@@ -4503,6 +4519,18 @@ function buildVirtual(source, opts) {
   try {
     if (source.charCodeAt(0) === 0x23) vfail('shebang script');
     const compiled = compileToProtos(source);
+    // Read-only globals that are not part of the standard library: these must
+    // keep resolving by name, because the code that defines them lives outside
+    // this script (a chunk fetched at run time, an executor callback).
+    const plainGlobals = [];
+    for (const nm of compiled.gRead) {
+      if (compiled.gWrite.has(nm)) continue;
+      if (RESERVED_NAMES.has(nm) || KEYWORDS.has(nm)) continue;
+      if (!/^[A-Za-z_][A-Za-z0-9_]{0,48}$/.test(nm)) continue;
+      plainGlobals.push(nm);
+    }
+    plainGlobals.sort();
+    plainGlobals.length = Math.min(plainGlobals.length, 400);
     let total = 0;
     for (const p of compiled.protos) total += p.code.length;
     if (total === 0) vfail('nothing to compile');
@@ -4622,6 +4650,7 @@ function buildVirtual(source, opts) {
       chaff,
       layout,
       link,
+      plainGlobals,
       maxAgeSeconds,
       // Strings are stored as differences between neighbouring bytes, so even a
       // completely decoded constant is still unreadable: it has to be summed back
@@ -5002,6 +5031,14 @@ function shadowRuntime(seed) {
 }
 
 export { obfuscate };
+
+
+
+
+
+
+
+
 
 
 
