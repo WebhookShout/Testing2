@@ -145,6 +145,80 @@ function GetNumberWithMath(num) {
 
 
 
+/**
+ * Cloudflare Worker — Luau / Roblox script obfuscator (stronger build)
+ *
+ * What it does to the script it is given:
+ *   1. Removes comments (-- line comments and --[[ ]] block comments).
+ *   2. Renames every local variable, function parameter and loop variable.
+ *   3. Renames table fields and global functions the script defines itself.
+ *   4. Hides builtin globals (print, game, Instance, string, ...) behind
+ *      encoded environment lookups.
+ *   5. Hides every property, method and service name — Parent, Transparency,
+ *      GetService, RunService, HttpService, JSONEncode, JSONDecode, UrlEncode,
+ *      ... — behind encoded bracket keys, including methods called on the
+ *      result of another call.
+ *   6. Encrypts every string literal with a byte keystream: each byte is
+ *      substituted through the S-box with an index built from its position, a
+ *      fresh per-payload nonce and a seed that only travels RSA-encrypted and
+ *      is unwrapped inside the runtime prelude. Payloads use a symbol-heavy
+ *      alphabet ('@#$%^&*()' and friends) so they read as noise, are padded to
+ *      whole blocks so their length does not leak, and are cut into fragments
+ *      the runtime joins backwards, with decoy payloads mixed in. Every number
+ *      is encoded too: integers become arithmetic, decimals and exponents
+ *      travel as encrypted text and are parsed at run time.
+ *   7. Hands the decode algorithm itself to a small virtual machine: the
+ *      instructions, operands and opcode numbers are packed into one string and
+ *      interpreted by a stack machine whose handlers are renumbered, shuffled
+ *      and padded with dead ones, so the output never contains a readable
+ *      decode routine.
+ *   8. Decrypts a canary token before anything happens: if the decoder is not
+ *      the one that was built here, the whole chunk returns quietly.
+ *   9. Wraps the body in an always-true arithmetic test with a dead branch, and
+ *      stores every hidden name in one table at shuffled slots. A slot is only
+ *      decrypted the first time something asks for it, so a name and the code
+ *      that uses it are never next to each other and junk slots never decrypt.
+ *  10. Squeezes the whole result onto one line.
+ *  12. Whole-program mode (the default): the script is parsed and compiled into
+ *      register bytecode for a small virtual machine, so the original logic is
+ *      not in the output at all — not as statements, not as an AST, not as
+ *      opcode names. Opcodes are renumbered per build, each opcode stores its
+ *      three operands in a different order, the dispatcher is a nested
+ *      if/elseif tree instead of a handler table, and every instruction is
+ *      decrypted inside the execution loop from a key built from its position,
+ *      the previous ciphertext character and a seed that folds in the freshness
+ *      gate plus a length checksum, so patching either makes the stream decode
+ *      to nonsense. String and number constants are decrypted lazily, the first
+ *      time the code path that needs them runs.
+ *
+ *      If the parser meets anything it does not understand (goto, string
+ *      interpolation, an if-expression, ...) the whole script falls back to the
+ *      layered token pipeline described above, which is also what
+ *      `virtualize: false` selects. Nothing is ever silently dropped: a fallback
+ *      is reported in the response as `fallback`.
+ *
+ *      Costs: virtualized code runs several times slower than plain Luau and
+ *      the output is larger, because every call allocates an argument table and
+ *      every statement is interpreted.
+ *
+ * The script keeps behaving exactly like the original. This is code
+ * protection, not a security boundary: someone can still run the script and
+ * read the strings it builds.
+ *
+ * Deploy: paste into a Worker, or `npx wrangler deploy` this file as your
+ * entrypoint. Then:
+ *   POST /            JSON  { "script": "print('hi')", "renameIdentifiers": true,
+ *                             "encodeNumbers": true, "stripComments": true }
+ *   POST /            raw text body (the script itself)
+ *   GET  /            a page with a text box to try it
+ *
+ * Response: { "success": true, "script": "<obfuscated>", ... }
+ */
+
+// The obfuscator is also shipped to the browser page, so the page can do the
+// work locally: a Worker is killed when one request takes too much CPU/memory,
+// which is what big hub scripts used to hit (the site answered 502 "Site
+// unavailable" instead of JSON). The page imports this same module instead.
 import CLIENT_SOURCE from 'obf-client.js';
 
 const MAX_SCRIPT_BYTES = 512 * 1024;
@@ -5137,7 +5211,6 @@ const PAGE = `<!doctype html>
   });
 </script>
 </html>`;
-
 
 
 
