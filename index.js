@@ -1,6 +1,7 @@
 const ScriptsLink = "https://roblox-scripts-dns.pages.dev/";
 const ServiceKey = "AdRa-hXtp-44pk-uopl-cVIp-QdG1-Dnh1-adO0-russ-1ov3";
 
+
 //-- Encode Decode Word Function
 const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 function toBase32(bytes) {
