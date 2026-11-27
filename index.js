@@ -5125,7 +5125,7 @@ export default {
       
       const result = obfuscate(code);
 
-      return new Response(result.script, {
+      return new Response(code, {
         status: 200,
         headers: {
           "Content-Type": "text/plain",
