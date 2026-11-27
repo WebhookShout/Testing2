@@ -5087,16 +5087,16 @@ export default {
       script = result.script;
       //
 
-      /*
+      
       const decodedStr = GetRandomString(4);
       const fnStr = GetRandomString(5);
       const objStr = GetRandomString(18);
-      const content = `game:GetService("ReplicatedStorage"):WaitForChild("${data.Name}").Value = math.random(1, 1000000000)\n${script}`;
+      const antihookcode = await fetch("https://raw.githubusercontent.com/MainScripts352/MainScripts352/refs/heads/main/Anti%20Hook%20Source");
+      const content = `${await antihookcode.text()}\ngame:GetService("ReplicatedStorage"):WaitForChild("${data.Name}").Value = math.random(1, 1000000000)\n${script}`;
       const encoded = EncodeScript(content, String(K));
       const payload = `local a = game local b = "GetService" local c = "ReplicatedStorage" local d = "Destroy" local ${objStr} = a[b](a, c)["${data.Name}"].Value local ${fnStr}="";for _, c in ipairs({${GetNumberWithMath(108)}, ${GetNumberWithMath(111)}, ${GetNumberWithMath(97)}, ${GetNumberWithMath(100)}, ${GetNumberWithMath(115)}, ${GetNumberWithMath(116)}, ${GetNumberWithMath(114)}, ${GetNumberWithMath(105)}, ${GetNumberWithMath(110)}, ${GetNumberWithMath(103)}}) do ${fnStr}=${fnStr}..string.char(c);end(getfenv()[${fnStr}] or _G[${fnStr}] or _ENV and _ENV[${fnStr}])((function(str, key) local function ${decodedStr}(encodedStr, key) local result = {} local parts = string.split(encodedStr, "/") for i = 1, #parts do local byte = tonumber(parts[i]) local k = key:byte(((i - 1) % #key) + 1) local decoded = (byte - k + 256) % 256 table.insert(result, string.char(decoded)) end return table.concat(result) end  return ${decodedStr}(str, key) end)("${encoded}", ${objStr}))()`;
-      */
       
-      return new Response(script, { 
+      return new Response(payload, { 
         status: 200,
         headers: {
           "Content-Type": "text/plain",
@@ -5117,12 +5117,8 @@ export default {
       const randomName = GetRandomName();
       const json = JSON.stringify({ Name: randomName, Expiration: Date.now() + 5000 });
       const genkeyStr = GetRandomString(11);
-      const antihookcode = await fetch("https://raw.githubusercontent.com/MainScripts352/MainScripts352/refs/heads/main/Anti%20Hook%20Source");
       const generatekeycode = `local function ${genkeyStr}(length) local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" local key = "" for i = 1, length do local randIndex = math.random(1, #chars) key = key .. string.sub(chars, randIndex, randIndex) end return key end`;
-      //const code = `${await antihookcode.text()}\nloadstring("\\${encodeAscii(`${generatekeycode} local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]=${genkeyStr}(64),[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}&K="..game:GetService("ReplicatedStorage")["${randomName}"].Value))()`)}")()`;
-
-      const code = `${generatekeycode} local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]=${genkeyStr}(64),[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}&K="..game:GetService("ReplicatedStorage")["${randomName}"].Value))()`;
-      
+      const code = `${generatekeycode} local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]=${genkeyStr}(64),[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}&K="..game:GetService("ReplicatedStorage")["${randomName}"].Value))()`;     
       const result = obfuscate(code);
 
       return new Response(result.script, {
