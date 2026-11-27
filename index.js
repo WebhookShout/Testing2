@@ -1,6 +1,21 @@
 const ScriptsLink = "https://roblox-scripts-dns.pages.dev/";
-const ServiceKey = "AdRa-hXtp-44pk-uopl-cVIp-QdG1-Dnh1-adO0-russ-1ov3";
+// --- demo fallback: only used when the scripts link above has no such file ---
+const DEMO_SCRIPTS = { "script.lua": "-- Demo script served by the hub, so /script has something real to hand out.\nlocal Players = game:GetService(\"Players\")\nlocal player = Players.LocalPlayer\n\nprint(\"[Hub Demo] Script started.\")\nprint(\"[Hub Demo] Player:\", player.Name)\n\nlocal gui = Instance.new(\"ScreenGui\")\ngui.Name = \"HubDemo\"\ngui.ResetOnSpawn = false\ngui.Parent = player:WaitForChild(\"PlayerGui\")\n\nlocal frame = Instance.new(\"Frame\")\nframe.Size = UDim2.new(0, 280, 0, 96)\nframe.Position = UDim2.new(0.5, -140, 0, 40)\nframe.BackgroundColor3 = Color3.fromRGB(22, 24, 34)\nframe.BorderSizePixel = 0\nframe.Parent = gui\n\nlocal corner = Instance.new(\"UICorner\")\ncorner.CornerRadius = UDim.new(0, 10)\ncorner.Parent = frame\n\nlocal label = Instance.new(\"TextLabel\")\nlabel.Size = UDim2.new(1, -24, 1, -24)\nlabel.Position = UDim2.new(0, 12, 0, 12)\nlabel.BackgroundTransparency = 1\nlabel.TextColor3 = Color3.fromRGB(130, 255, 180)\nlabel.TextScaled = true\nlabel.Font = Enum.Font.GothamBold\nlabel.Text = \"Hub demo loaded\"\nlabel.Parent = frame\n\nlocal function fib(n)\n    if n < 2 then\n        return n\n    end\n    return fib(n - 1) + fib(n - 2)\nend\n\nfor i = 1, 5 do\n    print(\"[Hub Demo] step\", i, \"fib\", fib(i + 10))\n    task.wait(0.4)\nend\n\nprint(\"[Hub Demo] Finished. If you can read this, the hub works.\")\n" };
+async function upstream(rel) {
+  let r;
+  try {
+    r = await fetch(ScriptsLink + rel);
+  } catch (e) {
+    r = new Response("", { status: 599 });
+  }
+  if (r.ok) return r;
+  if (Object.prototype.hasOwnProperty.call(DEMO_SCRIPTS, rel)) {
+    return new Response(DEMO_SCRIPTS[rel], { status: 200 });
+  }
+  return r;
+}
 
+const ServiceKey = "AdRa-hXtp-44pk-uopl-cVIp-QdG1-Dnh1-adO0-russ-1ov3";
 
 //-- Encode Decode Word Function
 const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -5040,7 +5055,7 @@ export default {
     
     
     if (pathname && pathname === "testing") {
-      const script = `loadstring(game:HttpGet("${domain}/source?auth=${EncodeText(Date.now() + 5000, ServiceKey)}"))()`;
+      const script = `print("Obfuscator is working!")`;
       const result = obfuscate(script);
       return new Response(result.script, { status: 200, headers: { "Content-Type": "text/plain", ...CORS }});
     }
@@ -5062,7 +5077,7 @@ export default {
     if (pathname && auth && K) {
       const key = pathname;
       const data = JSON.parse(DecodeText(auth, ServiceKey));
-      const req_data = await fetch(ScriptsLink + key + ".lua");     
+      const req_data = await upstream(key + ".lua");     
       let script = await req_data.text();
       
       if (!req_data.ok) {
@@ -5106,19 +5121,26 @@ export default {
       });
     }
 
-    // Authorize Specific Key
-    if (pathname) { 
-      const randomName = GetRandomName();
-      const json = JSON.stringify({ Name: randomName, Expiration: Date.now() + 5000 });
-      const genkeyStr = GetRandomString(11);
-      const antihookcode = await fetch("https://raw.githubusercontent.com/MainScripts352/MainScripts352/refs/heads/main/Anti%20Hook%20Source");
-      const generatekeycode = `local function ${genkeyStr}(length) local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789" local key = "" for i = 1, length do local randIndex = math.random(1, #chars) key = key .. string.sub(chars, randIndex, randIndex) end return key end`;
-      //const code = `${await antihookcode.text()}\nloadstring("\\${encodeAscii(`${generatekeycode} local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]=${genkeyStr}(64),[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}&K="..game:GetService("ReplicatedStorage")["${randomName}"].Value))()`)}")()`;
+    // Serve the requested script directly (no loadstring, no key dance)
+    if (pathname) {
+      let res = await upstream(pathname + ".lua");
+      let script = res.ok ? await res.text() : "";
 
-      const code = `${await antihookcode.text()}\n${generatekeycode} local t={[1]=Instance,[2]="new",[3]="StringValue",[4]=game,[5]="GetService",[6]="ReplicatedStorage",[7]="Parent",[8]="Name",[9]="Archivable",[10]="Value",[11]=true,[12]=${genkeyStr}(64),[13]="${randomName}"} local v=t[1][t[2]](t[3])v[t[7]]=t[4][t[5]](t[4], t[6])v[t[8]]=t[13]v[t[9]]=t[11]v[t[10]]=t[12] loadstring(game:HttpGet("${domain}/${url.pathname.slice(1)}?auth=${EncodeText(json, ServiceKey)}&K="..game:GetService("ReplicatedStorage")["${randomName}"].Value))()`;
+      // fall back to the raw name in case the file has no .lua extension
+      if (!script) {
+        const res2 = await upstream(pathname);
+        if (res2.ok) {
+          const alt = await res2.text();
+          if (alt) { script = alt; res = res2; }
+        }
+      }
 
-      const result = obfuscate(code);
-      
+      if (!script) {
+        return new Response(`404: No script named "${pathname}" was found at ${ScriptsLink}${pathname}.lua (upstream said ${res.status})`, { status: 404, headers: { "Content-Type": "text/plain", ...CORS }});
+      }
+
+      const result = obfuscate(script);
+
       return new Response(result.script, {
         status: 200,
         headers: {
